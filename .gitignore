@@ -187,3 +187,6 @@ results/tables/*
 !results/tables/.gitkeep
 results/plots/*
 !results/plots/.gitkeep
+
+# Personal task tracker
+TODO.md

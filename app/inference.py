@@ -1,13 +1,18 @@
 # app/inference.py
 """Unified inference functions for all 4 modes."""
 
+from typing import Any
+
 import numpy as np
-from typing import Tuple
-from app.model import compute_manual_score, sigmoid
-from app.encoding import encoded_plaintext_score
+
+from app.client import Client
+from app.server import Server
 
 
-def plaintext_inference(model, X_test: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def plaintext_inference(
+    model: Any,  # TODO: уточнить тип (Pipeline) после реализации model.py
+    x_test: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Standard sklearn inference.
 
@@ -19,10 +24,10 @@ def plaintext_inference(model, X_test: np.ndarray) -> Tuple[np.ndarray, np.ndarr
 
 
 def manual_plaintext_inference(
-    X_scaled: np.ndarray,
+    x_scaled: np.ndarray,
     w: np.ndarray,
     b: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Inference via manual weight multiplication.
 
@@ -34,12 +39,12 @@ def manual_plaintext_inference(
 
 
 def encoded_plaintext_inference(
-    X_scaled: np.ndarray,
+    x_scaled: np.ndarray,
     w: np.ndarray,
     b: float,
     scale: int,
     threshold: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Fixed-point encoded inference without encryption.
 
@@ -50,7 +55,11 @@ def encoded_plaintext_inference(
     raise NotImplementedError
 
 
-def phe_inference_one(client, server, x_raw: np.ndarray) -> Tuple[int, float]:
+def phe_inference_one(
+    client: Client,
+    server: Server,
+    x_raw: np.ndarray,
+) -> tuple[int, float]:
     """
     Execute full PHE protocol for a single sample.
 
@@ -67,8 +76,10 @@ def phe_inference_one(client, server, x_raw: np.ndarray) -> Tuple[int, float]:
 
 
 def phe_inference_batch(
-    client, server, X_raw: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+    client: Client,
+    server: Server,
+    x_raw: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Execute PHE protocol for multiple samples.
 

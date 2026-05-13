@@ -1,12 +1,10 @@
 # app/client.py
 """Client-side logic for secure inference."""
 
-import numpy as np
-from typing import List
-import phe as paillier
+from typing import Any
 
-from app.encoding import encode_vector
-from app.crypto import generate_keys, encrypt_vector, decrypt_score
+import numpy as np
+import phe as paillier
 
 
 class Client:
@@ -21,7 +19,7 @@ class Client:
     - Decrypt result and compute final prediction
     """
 
-    def __init__(self, scaler, scale: int, key_length: int = 1024):
+    def __init__(self, scaler: Any, scale: int, key_length: int = 1024) -> None:
         """
         Initialize client with a pre-fitted StandardScaler.
 
@@ -43,14 +41,12 @@ class Client:
         # TODO: use encode_vector
         raise NotImplementedError
 
-    def encrypt(self, x_int: np.ndarray) -> List[paillier.EncryptedNumber]:
+    def encrypt(self, x_int: np.ndarray) -> list[paillier.EncryptedNumber]:
         """Encrypt integer feature vector with public key."""
         # TODO: use encrypt_vector
         raise NotImplementedError
 
-    def decrypt_and_predict(
-        self, encrypted_score: paillier.EncryptedNumber
-    ) -> tuple[int, float]:
+    def decrypt_and_predict(self, encrypted_score: paillier.EncryptedNumber) -> tuple[int, float]:
         """
         Decrypt score, apply sigmoid and threshold.
 

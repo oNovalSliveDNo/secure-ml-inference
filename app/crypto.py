@@ -2,10 +2,11 @@
 """Paillier encryption wrapper using the python-paillier library."""
 
 import phe as paillier
-from typing import List
 
 
-def generate_keys(n_length: int = 1024) -> tuple:
+def generate_keys(
+    n_length: int = 1024,
+) -> tuple[paillier.PaillierPublicKey, paillier.PaillierPrivateKey]:
     """
     Generate a Paillier keypair.
 
@@ -21,8 +22,8 @@ def generate_keys(n_length: int = 1024) -> tuple:
 
 def encrypt_vector(
     public_key: paillier.PaillierPublicKey,
-    x_int: List[int],
-) -> List[paillier.EncryptedNumber]:
+    x_int: list[int],
+) -> list[paillier.EncryptedNumber]:
     """
     Encrypt a list of integers under the given public key.
 

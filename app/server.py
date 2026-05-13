@@ -2,7 +2,6 @@
 """Server-side logic for secure inference."""
 
 import numpy as np
-from typing import List
 import phe as paillier
 
 
@@ -35,7 +34,7 @@ class Server:
 
     def compute_encrypted_score(
         self,
-        enc_x: List[paillier.EncryptedNumber],
+        enc_x: list[paillier.EncryptedNumber],
     ) -> paillier.EncryptedNumber:
         """
         Compute Enc(z) = sum(enc_x_i * w_i) + Enc(b_int).

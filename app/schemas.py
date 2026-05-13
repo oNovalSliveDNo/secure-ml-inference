@@ -2,14 +2,13 @@
 """Pydantic models for API request/response validation."""
 
 from pydantic import BaseModel
-from typing import List
 
 
 class EncryptedInferRequest(BaseModel):
     """Request body for /infer/encrypted."""
 
     public_key_n: str
-    encrypted_features: List[str]
+    encrypted_features: list[str]
     scale: int
     feature_count: int
 

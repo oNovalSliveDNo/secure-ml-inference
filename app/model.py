@@ -3,12 +3,10 @@
 
 import numpy as np
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
 
 
 def train_baseline_model(
-    X_train: np.ndarray,
+    x_train: np.ndarray,
     y_train: np.ndarray,
     random_state: int,
 ) -> Pipeline:
@@ -52,7 +50,7 @@ def extract_linear_params(pipeline: Pipeline) -> tuple[np.ndarray, float]:
 
 
 def compute_manual_score(
-    X: np.ndarray,
+    x: np.ndarray,
     w: np.ndarray,
     b: float,
 ) -> np.ndarray:

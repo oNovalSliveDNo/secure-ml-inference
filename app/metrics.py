@@ -1,23 +1,17 @@
 # app/metrics.py
 """Utility functions for classification metrics, timing, and payload size."""
 
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
-from sklearn.metrics import (
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-    roc_auc_score,
-)
-import time
-from typing import Dict
 
 
 def classification_metrics(
     y_true: np.ndarray,
     y_pred: np.ndarray,
     y_prob: np.ndarray | None = None,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Compute standard classification metrics.
 
@@ -36,7 +30,7 @@ def classification_metrics(
 def compare_predictions(
     pred1: np.ndarray,
     pred2: np.ndarray,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Compare two prediction arrays.
 
@@ -47,13 +41,13 @@ def compare_predictions(
     raise NotImplementedError
 
 
-def timing_decorator(func):
+def timing_decorator(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator to measure execution time."""
     # TODO: implement wrapper using time.perf_counter
     raise NotImplementedError
 
 
-def measure_payload_size(obj) -> int:
+def measure_payload_size(obj: Any) -> int:
     """
     Estimate size in bytes of an object when serialized as JSON.
 

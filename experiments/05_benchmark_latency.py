@@ -2,14 +2,6 @@
 """Experiment 05: Benchmark latency components of PHE inference."""
 
 import logging
-import time
-import numpy as np
-import pandas as pd
-from pathlib import Path
-from app.client import Client
-from app.server import Server
-from app.model import load_model, extract_linear_params
-from app.config import N_BENCHMARK_RUNS, SCALE, KEY_LENGTH
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

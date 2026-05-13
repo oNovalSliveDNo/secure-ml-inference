@@ -2,8 +2,6 @@
 """Dataset loading and splitting for Breast Cancer Wisconsin."""
 
 import pandas as pd
-from sklearn.datasets import load_breast_cancer
-from sklearn.model_selection import train_test_split
 
 
 def load_dataset() -> tuple[pd.DataFrame, pd.Series]:
@@ -19,8 +17,8 @@ def load_dataset() -> tuple[pd.DataFrame, pd.Series]:
 
 
 def split_dataset(
-    X: pd.DataFrame,
-    y: pd.Series,
+    features: pd.DataFrame,
+    target: pd.Series,
     test_size: float,
     random_state: int,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
@@ -28,8 +26,8 @@ def split_dataset(
     Split into train/test with stratification.
 
     Args:
-        X: Features DataFrame.
-        y: Target Series.
+        features: Features DataFrame.
+        target: Target Series.
         test_size: Proportion of test set.
         random_state: Seed for reproducibility.
 
