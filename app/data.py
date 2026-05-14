@@ -2,18 +2,31 @@
 """Dataset loading and splitting for Breast Cancer Wisconsin."""
 
 import pandas as pd
+from sklearn.datasets import load_breast_cancer
+from sklearn.model_selection import train_test_split
 
 
 def load_dataset() -> tuple[pd.DataFrame, pd.Series]:
     """
-    Load breast cancer data as DataFrame and return features, target.
+    Load the breast cancer dataset as pandas objects.
 
     Returns:
-        X: DataFrame with 30 features.
-        y: Series with binary target (0=malignant, 1=benign).
+        A tuple of feature matrix and target vector `(X, y)` where `X` is a
+        DataFrame of shape `(569, 30)` and `y` is a Series of shape `(569,)`.
+
+    Raises:
+        ValueError: If loaded dataset shapes do not match expected dimensions.
     """
-    # TODO: implement using load_breast_cancer(as_frame=True)
-    raise NotImplementedError
+    dataset = load_breast_cancer(as_frame=True)
+    X: pd.DataFrame = dataset.data
+    y: pd.Series = dataset.target
+
+    if X.shape != (569, 30):
+        raise ValueError(f"Unexpected features shape: {X.shape}. Expected (569, 30).")
+    if y.shape != (569,):
+        raise ValueError(f"Unexpected target shape: {y.shape}. Expected (569,).")
+
+    return X, y
 
 
 def split_dataset(
@@ -23,16 +36,22 @@ def split_dataset(
     random_state: int,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     """
-    Split into train/test with stratification.
+    Split dataset into train/test subsets with class stratification.
 
     Args:
         features: Features DataFrame.
         target: Target Series.
-        test_size: Proportion of test set.
-        random_state: Seed for reproducibility.
+        test_size: Proportion of dataset to include in the test split.
+        random_state: Seed for reproducible splits.
 
     Returns:
-        X_train, X_test, y_train, y_test.
+        A tuple `(X_train, X_test, y_train, y_test)`.
     """
-    # TODO: implement using train_test_split(stratify=y)
-    raise NotImplementedError
+    X_train, X_test, y_train, y_test = train_test_split(
+        features,
+        target,
+        test_size=test_size,
+        random_state=random_state,
+        stratify=target,
+    )
+    return X_train, X_test, y_train, y_test
