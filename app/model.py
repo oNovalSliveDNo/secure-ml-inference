@@ -1,8 +1,12 @@
 # app/model.py
 """Baseline model training, persistence, and weight extraction."""
 
+import os
 import numpy as np
 from sklearn.pipeline import Pipeline
+import joblib
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 
 
 def train_baseline_model(
@@ -14,39 +18,68 @@ def train_baseline_model(
     Train StandardScaler + LogisticRegression pipeline.
 
     Args:
-        X_train: Training features.
+        x_train: Training features.
         y_train: Training labels.
         random_state: Seed for reproducibility.
 
     Returns:
         Fitted scikit-learn Pipeline.
     """
-    # TODO: create pipeline, fit, return
-    raise NotImplementedError
+    pipeline = Pipeline(
+        steps=[
+            ("scaler", StandardScaler()),
+            (
+                "logreg",
+                LogisticRegression(
+                    max_iter=1000,
+                    solver="lbfgs",
+                    random_state=random_state,
+                ),
+            ),
+        ]
+    )
+    pipeline.fit(x_train, y_train)
+    return pipeline
 
 
 def save_model(pipeline: Pipeline, filepath: str) -> None:
     """Save trained pipeline to disk using joblib."""
-    # TODO: implement saving
-    raise NotImplementedError
+    if pipeline is None:
+        raise ValueError("pipeline must not be None")
+    joblib.dump(pipeline, filepath)
 
 
 def load_model(filepath: str) -> Pipeline:
     """Load trained pipeline from disk."""
-    # TODO: implement loading
-    raise NotImplementedError
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Model file not found: {filepath}")
+    return joblib.load(filepath)
 
 
 def extract_linear_params(pipeline: Pipeline) -> tuple[np.ndarray, float]:
     """
     Extract weight vector w and bias b from the logistic regression step.
 
+    Args:
+        pipeline: Fitted baseline pipeline.
+
     Returns:
         w: 1D array of coefficients (shape: n_features).
-        b: intercept (float).
+        b: Intercept value.
+
+    Raises:
+        ValueError: If pipeline is None or missing the logistic regression step.
     """
-    # TODO: extract coef_ and intercept_ from the pipeline's named step
-    raise NotImplementedError
+    if pipeline is None:
+        raise ValueError("pipeline must not be None")
+
+    model = pipeline.named_steps.get("logreg")
+    if model is None:
+        raise ValueError("pipeline must contain a 'logreg' step")
+
+    w = model.coef_.ravel()
+    b = float(model.intercept_.ravel()[0])
+    return w, b
 
 
 def compute_manual_score(
@@ -58,18 +91,16 @@ def compute_manual_score(
     Compute linear score z = X @ w + b.
 
     Args:
-        X: Scaled feature matrix (n_samples, n_features).
+        x: Scaled feature matrix (n_samples, n_features).
         w: Weight vector (n_features).
         b: Intercept.
 
     Returns:
         Linear score for each sample.
     """
-    # TODO: implement
-    raise NotImplementedError
+    return x @ w + b
 
 
 def sigmoid(z: np.ndarray) -> np.ndarray:
     """Compute sigmoid function element-wise."""
-    # TODO: implement
-    raise NotImplementedError
+    return 1.0 / (1.0 + np.exp(-z))
