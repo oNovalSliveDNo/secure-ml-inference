@@ -114,10 +114,14 @@ streamlit run ui/streamlit_app.py --server.port 8501
 docker compose up --build
 ```
 
-После запуска:
-- FastAPI: http://localhost:8000
+Compose поднимает два сервиса:
+- `api` — FastAPI (`uvicorn api.main:app`) на порту `8000`
+- `ui` — Streamlit (`ui/streamlit_app.py`) на порту `8501`, запускается после `api` (`depends_on`)
+
+Проверка доступности:
+- API health: http://localhost:8000/health
 - Swagger UI: http://localhost:8000/docs
-- Streamlit: http://localhost:8501
+- Streamlit UI: http://localhost:8501
 
 ## Модель угроз
 

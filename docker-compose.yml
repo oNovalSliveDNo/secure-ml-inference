@@ -1,0 +1,24 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: secure-ml-api
+    working_dir: /app
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: secure-ml-ui
+    working_dir: /app
+    command: streamlit run ui/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+    depends_on:
+      - api
+    ports:
+      - "8501:8501"
+    environment:
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
