@@ -22,15 +22,19 @@ class Server:
         w_int: np.ndarray,
         b_int: int,
         public_key: paillier.PaillierPublicKey,
-    ):
+    ) -> None:
         """
+        Initialize server with encoded model parameters and a public key.
+
         Args:
             w_int: Encoded weight vector.
             b_int: Encoded bias.
             public_key: Client's public key for encrypting bias.
         """
-        # TODO: store weights, bias, public key; pre-encrypt bias
-        raise NotImplementedError
+        self.w_int: np.ndarray = np.asarray(w_int, dtype=np.int64)
+        self.b_int: int = int(b_int)
+        self.public_key: paillier.PaillierPublicKey = public_key
+        self.enc_b: paillier.EncryptedNumber = self.public_key.encrypt(self.b_int)
 
     def compute_encrypted_score(
         self,
@@ -44,6 +48,14 @@ class Server:
 
         Returns:
             Encrypted linear score.
+
+        Raises:
+            ValueError: If feature length does not match model weight length.
         """
-        # TODO: implement linear combination under encryption
-        raise NotImplementedError
+        if len(enc_x) != len(self.w_int):
+            raise ValueError("enc_x length must match w_int length")
+
+        enc_score: paillier.EncryptedNumber = self.enc_b
+        for enc_feature, weight in zip(enc_x, self.w_int, strict=True):
+            enc_score = enc_score + (enc_feature * int(weight))
+        return enc_score
