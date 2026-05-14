@@ -15,8 +15,9 @@ def encode_vector(x: np.ndarray, scale: int) -> np.ndarray:
     Returns:
         Integer vector (int64).
     """
-    # TODO: implement
-    raise NotImplementedError
+    x_array: np.ndarray = np.asarray(x, dtype=np.float64)
+    encoded: np.ndarray = np.rint(x_array * scale).astype(np.int64)
+    return encoded
 
 
 def encode_weights(w: np.ndarray, scale: int) -> np.ndarray:
@@ -30,8 +31,9 @@ def encode_weights(w: np.ndarray, scale: int) -> np.ndarray:
     Returns:
         Integer weight vector.
     """
-    # TODO: implement
-    raise NotImplementedError
+    w_array: np.ndarray = np.asarray(w, dtype=np.float64)
+    encoded: np.ndarray = np.rint(w_array * scale).astype(np.int64)
+    return encoded
 
 
 def encode_bias(b: float, scale: int) -> int:
@@ -45,8 +47,7 @@ def encode_bias(b: float, scale: int) -> int:
     Returns:
         Encoded bias integer.
     """
-    # TODO: implement
-    raise NotImplementedError
+    return int(np.rint(float(b) * scale * scale))
 
 
 def decode_score(score_int: int, scale: int) -> float:
@@ -60,8 +61,7 @@ def decode_score(score_int: int, scale: int) -> float:
     Returns:
         Real-valued linear score.
     """
-    # TODO: implement
-    raise NotImplementedError
+    return float(score_int) / float(scale * scale)
 
 
 def encoded_plaintext_score(
@@ -82,5 +82,9 @@ def encoded_plaintext_score(
     Returns:
         Real-valued score (after decoding).
     """
-    # TODO: implement using encode/decode functions
-    raise NotImplementedError
+    x_int: np.ndarray = encode_vector(x=x, scale=scale)
+    w_int: np.ndarray = encode_weights(w=w, scale=scale)
+    b_int: int = encode_bias(b=b, scale=scale)
+
+    score_int: int = int(np.dot(x_int, w_int) + b_int)
+    return decode_score(score_int=score_int, scale=scale)
