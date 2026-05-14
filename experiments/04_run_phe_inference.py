@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import warnings
 from pathlib import Path
 
 from app.client import Client
@@ -15,6 +16,9 @@ from app.inference import encoded_plaintext_inference, phe_inference_batch, plai
 from app.metrics import classification_metrics
 from app.model import extract_linear_params, load_model
 from app.server import Server
+
+warnings.filterwarnings("ignore")
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import time
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,9 @@ from app.data import load_dataset, split_dataset
 from app.encoding import encode_bias, encode_weights
 from app.model import extract_linear_params, load_model
 from app.server import Server
+
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+
 
 st.set_page_config(page_title="Secure ML Inference Demo", layout="wide")
 
@@ -79,9 +83,7 @@ def show_demo_inference(resources: dict[str, Any]) -> None:
     sample = x_test.iloc[sample_idx]
 
     st.subheader("Raw Features")
-    st.dataframe(
-        pd.DataFrame({"feature": sample.index, "value": sample.values}), use_container_width=True
-    )
+    st.dataframe(pd.DataFrame({"feature": sample.index, "value": sample.values}), width=True)
 
     if st.button("Run Secure Inference", type="primary"):
         client = Client(scaler=resources["scaler"], scale=SCALE, key_length=KEY_LENGTH)
@@ -125,7 +127,7 @@ def show_demo_inference(resources: dict[str, Any]) -> None:
                 ],
             }
         )
-        st.dataframe(timing_df, use_container_width=True)
+        st.dataframe(timing_df, width=True)
 
         st.subheader("Prediction")
         st.write(f"**True label:** {int(y_test.iloc[sample_idx])}")
@@ -169,8 +171,8 @@ def show_protocol_view(resources: dict[str, Any]) -> None:
         }
     )
     left, right = st.columns(2)
-    left.dataframe(client_table, use_container_width=True)
-    right.dataframe(server_table, use_container_width=True)
+    left.dataframe(client_table, width=True)
+    right.dataframe(server_table, width=True)
 
     demo_sample = resources["x_test"].iloc[0].to_numpy(dtype=float)
     client = Client(scaler=resources["scaler"], scale=SCALE, key_length=KEY_LENGTH)
@@ -193,7 +195,7 @@ def show_metrics_dashboard() -> None:
 
     for csv_file in csv_files:
         st.subheader(csv_file.name)
-        st.dataframe(pd.read_csv(csv_file), use_container_width=True)
+        st.dataframe(pd.read_csv(csv_file), width=True)
 
     plot_files = sorted(PLOTS_DIR.glob("*.png"))
 
@@ -202,7 +204,7 @@ def show_metrics_dashboard() -> None:
 
     for plot_file in plot_files:
         st.subheader(plot_file.name)
-        st.image(str(plot_file), use_container_width=True)
+        st.image(str(plot_file), width=True)
 
 
 def show_architecture() -> None:

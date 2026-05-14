@@ -38,6 +38,9 @@ dev = [
     "pytest",
 ]
 
+[tool.setuptools.packages.find]
+include = ["app", "api", "ui", "experiments"]
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"

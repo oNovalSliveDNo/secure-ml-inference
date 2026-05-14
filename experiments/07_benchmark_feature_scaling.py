@@ -6,6 +6,7 @@ from __future__ import annotations
 import csv
 import logging
 import time
+import warnings
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -18,6 +19,9 @@ from app.encoding import decode_score, encode_bias, encode_weights
 from app.metrics import measure_payload_size
 from app.model import extract_linear_params, load_model
 from app.server import Server
+
+warnings.filterwarnings("ignore")
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
