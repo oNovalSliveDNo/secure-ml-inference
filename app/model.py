@@ -1,11 +1,13 @@
 # app/model.py
 """Baseline model training, persistence, and weight extraction."""
 
-import os
-import numpy as np
-from sklearn.pipeline import Pipeline
+from pathlib import Path
+
 import joblib
+import numpy as np
+from numpy.typing import NDArray
 from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 
@@ -51,7 +53,7 @@ def save_model(pipeline: Pipeline, filepath: str) -> None:
 
 def load_model(filepath: str) -> Pipeline:
     """Load trained pipeline from disk."""
-    if not os.path.exists(filepath):
+    if not Path(filepath).exists():
         raise FileNotFoundError(f"Model file not found: {filepath}")
     return joblib.load(filepath)
 
@@ -86,7 +88,7 @@ def compute_manual_score(
     x: np.ndarray,
     w: np.ndarray,
     b: float,
-) -> np.ndarray:
+) -> NDArray[np.float64]:
     """
     Compute linear score z = X @ w + b.
 
@@ -98,9 +100,9 @@ def compute_manual_score(
     Returns:
         Linear score for each sample.
     """
-    return x @ w + b
+    return np.asarray(x @ w + b)
 
 
-def sigmoid(z: np.ndarray) -> np.ndarray:
+def sigmoid(z: NDArray[np.float64]) -> NDArray[np.float64]:
     """Compute sigmoid function element-wise."""
-    return 1.0 / (1.0 + np.exp(-z))
+    return np.asarray(1.0 / (1.0 + np.exp(-z)))
