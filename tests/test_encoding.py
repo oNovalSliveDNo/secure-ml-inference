@@ -1,3 +1,4 @@
+# tests/test_encoding.py
 """Unit tests for fixed-point encoding utilities."""
 
 import numpy as np

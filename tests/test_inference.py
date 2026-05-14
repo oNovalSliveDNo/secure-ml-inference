@@ -1,3 +1,4 @@
+# tests/test_inference.py
 """Unit tests for inference modes consistency."""
 
 import numpy as np

@@ -1,3 +1,4 @@
+# tests/test_client_server.py
 """Integration-style unit tests for client/server secure inference flow."""
 
 import numpy as np
