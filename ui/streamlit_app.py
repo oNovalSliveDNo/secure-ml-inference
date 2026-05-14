@@ -21,13 +21,13 @@ from app.server import Server
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
 
-st.set_page_config(page_title="Secure ML Inference Demo", layout="wide")
+st.set_page_config(page_title="Защищённый ML-инференс — Демонстрация", layout="wide")
 
 MODEL_PATH = Path("results/models/model.pkl")
 TABLES_DIR = Path("results/tables")
 PLOTS_DIR = Path("results/plots")
 
-st.set_page_config(page_title="Secure ML Inference Demo", layout="wide")
+st.set_page_config(page_title="Защищённый ML-инференс — Демонстрация", layout="wide")
 
 
 @st.cache_resource
@@ -42,7 +42,7 @@ def load_resources() -> dict[str, Any]:
     """
     if not MODEL_PATH.exists():
         raise FileNotFoundError(
-            f"Model artifact is missing at {MODEL_PATH}. Run experiments/01_train_baseline.py first."
+            f"Артефакт модели не найден по пути {MODEL_PATH}. Сначала запустите experiments/01_train_baseline.py."
         )
 
     model = load_model(str(MODEL_PATH))
@@ -73,19 +73,19 @@ def show_demo_inference(resources: dict[str, Any]) -> None:
     Args:
         resources: Cached app resources from ``load_resources``.
     """
-    st.header("Demo Inference")
+    st.header("Демонстрация защищённого инференса")
 
     x_test = resources["x_test"]
     y_test = resources["y_test"]
     model = resources["model"]
 
-    sample_idx = st.slider("Test sample index", 0, len(x_test) - 1, 0)
+    sample_idx = st.slider("Индекс тестового образца", 0, len(x_test) - 1, 0)
     sample = x_test.iloc[sample_idx]
 
-    st.subheader("Raw Features")
-    st.dataframe(pd.DataFrame({"feature": sample.index, "value": sample.values}), width=True)
+    st.subheader("Исходные признаки пациента")
+    st.dataframe(pd.DataFrame({"Признак": sample.index, "Значение": sample.values}), width='stretch')
 
-    if st.button("Run Secure Inference", type="primary"):
+    if st.button("Запустить защищённый инференс", type="primary"):
         client = Client(scaler=resources["scaler"], scale=SCALE, key_length=KEY_LENGTH)
         server = Server(
             w_int=resources["w_int"], b_int=resources["b_int"], public_key=client.public_key
@@ -110,16 +110,16 @@ def show_demo_inference(resources: dict[str, Any]) -> None:
             model.predict_proba(sample.to_numpy(dtype=float).reshape(1, -1))[:, 1][0]
         )
 
-        st.subheader("Protocol Execution")
+        st.subheader("Выполнение протокола")
         c1, c2, c3 = st.columns(3)
-        c1.metric("Encrypted features count", len(enc_x))
-        c2.metric("Ciphertext chars (sum)", sum(len(str(value.ciphertext())) for value in enc_x))
-        c3.metric("Total protocol time (ms)", f"{(t4 - t0) * 1000.0:.2f}")
+        c1.metric("Количество зашифрованных признаков", len(enc_x))
+        c2.metric("Суммарная длина шифртекстов (симв.)", sum(len(str(value.ciphertext())) for value in enc_x))
+        c3.metric("Общее время протокола (мс)", f"{(t4 - t0) * 1000.0:.2f}")
 
         timing_df = pd.DataFrame(
             {
-                "stage": ["preprocess+encode", "encrypt", "server_compute", "decrypt+predict"],
-                "time_ms": [
+                "Этап": ["Предобработка + кодирование", "Шифрование", "Вычисление на сервере", "Расшифрование и прогноз"],
+                "Время (мс)": [
                     (t1 - t0) * 1000.0,
                     (t2 - t1) * 1000.0,
                     (t3 - t2) * 1000.0,
@@ -127,14 +127,14 @@ def show_demo_inference(resources: dict[str, Any]) -> None:
                 ],
             }
         )
-        st.dataframe(timing_df, width=True)
+        st.dataframe(timing_df, width='stretch')
 
-        st.subheader("Prediction")
-        st.write(f"**True label:** {int(y_test.iloc[sample_idx])}")
-        st.write(f"**Secure prediction:** {pred_secure} (p={prob_secure:.6f})")
-        st.write(f"**Baseline prediction:** {pred_baseline} (p={prob_baseline:.6f})")
+        st.subheader("Результат прогнозирования")
+        st.write(f"**Истинная метка:** {int(y_test.iloc[sample_idx])}")
+        st.write(f"**Защищённый прогноз:** {pred_secure} (p={prob_secure:.6f})")
+        st.write(f"**Базовый прогноз (plaintext):** {pred_baseline} (p={prob_baseline:.6f})")
         st.write(
-            f"**Match with baseline:** {'✅ yes' if pred_secure == pred_baseline else '❌ no'}"
+            f"**Совпадение с базовым прогнозом:** {'✅ yes' if pred_secure == pred_baseline else '❌ no'}"
         )
 
 
@@ -144,41 +144,41 @@ def show_protocol_view(resources: dict[str, Any]) -> None:
     Args:
         resources: Cached app resources.
     """
-    st.header("Protocol View")
+    st.header("Представление протокола")
 
     client_table = pd.DataFrame(
         {
             "Сторона клиента": [
-                "Raw features x",
-                "Scaler",
-                "Private key",
-                "Public key",
-                "Encoded/encrypted features",
-                "Decryption result",
+                "Исходные признаки (x)",
+                "Стандартизатор (scaler)",
+                "Закрытый ключ",
+                "Открытый ключ",
+                "Закодированные/зашифрованные признаки",
+                "Результат расшифрования",
             ]
         }
     )
     server_table = pd.DataFrame(
         {
             "Сторона сервера": [
-                "Encoded model weights w_int",
-                "Encoded bias b_int",
-                "Public key",
-                "Encrypted features only",
-                "Encrypted score",
-                "No plaintext features",
+                "Закодированные веса модели (w_int)",
+                "Закодированное смещение (b_int)",
+                "Открытый ключ",
+                "Только зашифрованные признаки",
+                "Зашифрованный линейный score",
+                "Открытые признаки не получает",
             ]
         }
     )
     left, right = st.columns(2)
-    left.dataframe(client_table, width=True)
-    right.dataframe(server_table, width=True)
+    left.dataframe(client_table, width='stretch')
+    right.dataframe(server_table, width='stretch')
 
     demo_sample = resources["x_test"].iloc[0].to_numpy(dtype=float)
     client = Client(scaler=resources["scaler"], scale=SCALE, key_length=KEY_LENGTH)
     encrypted = client.encrypt(client.encode(client.preprocess(demo_sample.reshape(1, -1))))
 
-    st.subheader("Example ciphertext strings")
+    st.subheader("Пример зашифрованных значений (первые три признака)")
     st.code(
         "\n".join(str(value.ciphertext())[:120] + "..." for value in encrypted[:3]), language="text"
     )
@@ -186,51 +186,51 @@ def show_protocol_view(resources: dict[str, Any]) -> None:
 
 def show_metrics_dashboard() -> None:
     """Render metrics tables and plots from experiment artifacts."""
-    st.header("Metrics Dashboard")
+    st.header("Панель метрик")
 
     csv_files = sorted(TABLES_DIR.glob("*.csv"))
 
     if not csv_files:
-        st.info("No CSV metrics found in results/tables/. Run experiments 04-07 first.")
+        st.info("CSV-файлы с метриками не найдены в results/tables/. Сначала запустите эксперименты № 04-07.")
 
     for csv_file in csv_files:
         st.subheader(csv_file.name)
-        st.dataframe(pd.read_csv(csv_file), width=True)
+        st.dataframe(pd.read_csv(csv_file), width='stretch')
 
     plot_files = sorted(PLOTS_DIR.glob("*.png"))
 
     if not plot_files:
-        st.info("No plots found in results/plots/.")
+        st.info("Графики не найдены в results/plots/.")
 
     for plot_file in plot_files:
         st.subheader(plot_file.name)
-        st.image(str(plot_file), width=True)
+        st.image(str(plot_file), width='stretch')
 
 
 def show_architecture() -> None:
     """Render architecture description tab."""
-    st.header("Architecture")
+    st.header("Архитектура системы")
     st.markdown(
         """
-### Secure Inference Flow
-1. **Client**: raw sample → scaler → fixed-point encoding (`SCALE`) → Paillier encryption.
-2. **Server**: receives only encrypted features and public key, computes encrypted linear score `Enc(z_int)`.
-3. **Client**: decrypts `z_int`, decodes to float `z`, applies sigmoid and threshold.
+### Поток защищённого инференса
+1. **Клиент**: исходные признаки → стандартизация → кодирование с фиксированной точкой (`SCALE`) → шифрование Пайе.
+2. **Сервер**: получает только зашифрованные признаки и открытый ключ, вычисляет зашифрованный линейный score `Enc(z_int)`.
+3. **Клиент**: расшифровывает `z_int`, преобразует в вещественное `z`, применяет сигмоиду и пороговое правило.
 
-### Trust Boundary
-- Server never sees plaintext features or the private key.
-- Client never sends model weights back to server; server keeps encoded model parameters.
+### Граница доверия
+- Сервер никогда не видит открытые признаки и не имеет доступа к закрытому ключу.
+- Клиент не передаёт параметры модели на сервер; сервер хранит только закодированные веса.
 
-### Message Exchange
-- Request: `public_key_n`, `encrypted_features[]`, `scale`
-- Response: `encrypted_score`
+### Формат сообщений
+- **Запрос**: `public_key_n`, `encrypted_features[]`, `scale`
+- **Ответ**: `encrypted_score`
         """
     )
 
 
 def main() -> None:
     """Run the Streamlit application."""
-    st.title("Secure ML Inference — Streamlit Client")
+    st.title("Защищённый ML-инференс — Клиент Streamlit")
     try:
         resources = load_resources()
     except FileNotFoundError as exc:
@@ -238,7 +238,7 @@ def main() -> None:
         st.stop()
 
     tab1, tab2, tab3, tab4 = st.tabs(
-        ["Demo Inference", "Protocol View", "Metrics Dashboard", "Architecture"]
+        ["Демонстрация инференса", "Представление протокола", "Панель метрик", "Архитектура"]
     )
 
     with tab1:
