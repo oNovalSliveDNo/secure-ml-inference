@@ -41,12 +41,12 @@ REM === Long-running / optional experiments ===
 REM To skip long steps, leave this block commented.
 REM To enable, remove leading REM from each line in the corresponding step.
 
-REM echo === Experiment 10: Benchmark by scale (optional, long) ===
-REM python experiments/10_benchmark_scale.py
-REM if %errorlevel% neq 0 exit /b %errorlevel%
+echo === Experiment 10: Benchmark by scale ===
+python experiments/10_benchmark_scale.py
+if %errorlevel% neq 0 exit /b %errorlevel%
 
-REM echo === Experiment 11: API roundtrip benchmark (optional, long) ===
-REM python experiments/11_benchmark_api_roundtrip.py
-REM if %errorlevel% neq 0 exit /b %errorlevel%
+echo === Experiment 11: API roundtrip benchmark ===
+python experiments/11_benchmark_api_roundtrip.py
+if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo All experiments have been successfully completed.

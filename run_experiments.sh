@@ -24,7 +24,7 @@ run_step "Experiment 9: Benchmark by key lengths" "experiments/09_benchmark_key_
 # To skip long steps, keep the lines below commented.
 # To enable, uncomment the corresponding run_step lines.
 
-# run_step "Experiment 10: Benchmark by scale (optional, long)" "experiments/10_benchmark_scale.py"
-# run_step "Experiment 11: API roundtrip benchmark (optional, long)" "experiments/11_benchmark_api_roundtrip.py"
+run_step "Experiment 10: Benchmark by scale" "experiments/10_benchmark_scale.py"
+run_step "Experiment 11: API roundtrip benchmark" "experiments/11_benchmark_api_roundtrip.py"
 
 echo "All experiments have been successfully completed."
