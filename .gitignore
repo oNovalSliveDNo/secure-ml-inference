@@ -180,13 +180,10 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-# Project specific
-results/models/*
-!results/models/.gitkeep
-results/tables/*
-!results/tables/.gitkeep
-results/plots/*
-!results/plots/.gitkeep
+# Project specific: keep final artifacts versionable; ignore only temporary/service files in results/
+results/**/*.tmp
+results/**/*.temp
+results/**/.DS_Store
 
 # Personal task tracker
 TODO.md
