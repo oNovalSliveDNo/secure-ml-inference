@@ -84,15 +84,31 @@ python experiments/01_train_baseline.py
 ### Запуск экспериментов
 
 ```bash
+python experiments/01_train_baseline.py
 python experiments/02_validate_manual_inference.py
 python experiments/03_run_encoded_inference.py
 python experiments/04_run_phe_inference.py
 python experiments/05_benchmark_latency.py
 python experiments/06_benchmark_payload.py
 python experiments/07_benchmark_feature_scaling.py
+python experiments/08_benchmark_datasets.py
+python experiments/09_benchmark_key_lengths.py
+python experiments/10_benchmark_scale.py
+python experiments/11_benchmark_api_roundtrip.py
 ```
 
 Результаты сохраняются в `results/tables/` и `results/plots/`.
+
+Рекомендуемый пакетный запуск:
+
+- Windows:
+  ```bat
+  run_experiments.bat
+  ```
+- Linux/macOS (если в репозитории добавлен/добавляется shell-скрипт):
+  ```bash
+  ./run_experiments.sh
+  ```
 
 ### Unit-тесты
 
@@ -102,7 +118,9 @@ python experiments/07_benchmark_feature_scaling.py
 pytest
 ```
 
-### Запуск сервера (FastAPI)
+### Запуск API и UI по отдельности
+
+#### API (FastAPI)
 
 ```bash
 uvicorn api.main:app --host 0.0.0.0 --port 8000
@@ -110,11 +128,13 @@ uvicorn api.main:app --host 0.0.0.0 --port 8000
 
 Документация: http://localhost:8000/docs
 
-### Запуск клиентского демо (Streamlit)
+#### UI (Streamlit)
 
 ```bash
 streamlit run ui/streamlit_app.py --server.port 8501
 ```
+
+UI — одностраничное демо-приложение для ввода признаков, запуска зашифрованного инференса и просмотра результата предсказания.
 
 ## Запуск через Docker
 
@@ -130,6 +150,14 @@ Compose поднимает два сервиса:
 - API health: http://localhost:8000/health
 - Swagger UI: http://localhost:8000/docs
 - Streamlit UI: http://localhost:8501
+
+## Учебная reference-реализация Paillier
+
+Для учебного разбора алгоритма и тестируемой минимальной реализации см.:
+
+- [docs/paillier_algorithm.md](docs/paillier_algorithm.md)
+- [app/paillier_reference.py](app/paillier_reference.py)
+- [tests/test_paillier_reference.py](tests/test_paillier_reference.py)
 
 ## Модель угроз
 
