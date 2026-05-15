@@ -36,6 +36,7 @@ STAGES = [
     "server_compute",
     "decryption",
     "sigmoid_threshold",
+    "total_without_keygen",
     "total",
 ]
 
@@ -132,6 +133,16 @@ def main() -> None:
         _ = int(probability >= THRESHOLD)
         t1 = time.perf_counter()
         measurements["sigmoid_threshold"].append(_to_ms(t0, t1))
+
+        total_without_keygen_ms = (
+            measurements["preprocessing"][-1]
+            + measurements["encoding"][-1]
+            + measurements["encryption"][-1]
+            + measurements["server_compute"][-1]
+            + measurements["decryption"][-1]
+            + measurements["sigmoid_threshold"][-1]
+        )
+        measurements["total_without_keygen"].append(total_without_keygen_ms)
 
         t_total_end = time.perf_counter()
         measurements["total"].append(_to_ms(t_total_start, t_total_end))

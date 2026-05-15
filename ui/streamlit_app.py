@@ -332,6 +332,18 @@ def show_metrics_dashboard() -> None:
         df = pd.read_csv(csv_file)
         st.subheader(f"Таблица: {csv_file.name}")
         st.dataframe(df, width="stretch")
+
+        if csv_file.name == "latency_metrics.csv" and {"stage", "mean_ms"}.issubset(df.columns):
+            totals = df.set_index("stage")["mean_ms"].to_dict()
+            total_with_keygen = totals.get("total")
+            total_without_keygen = totals.get("total_without_keygen")
+            if total_with_keygen is not None and total_without_keygen is not None:
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Общее время (с keygen), ms", f"{total_with_keygen:.2f}")
+                with col2:
+                    st.metric("Общее время (без keygen), ms", f"{total_without_keygen:.2f}")
+
         st.markdown(f"**Интерпретация:** {_get_table_explanation(csv_file.name, df)}")
 
     if not plot_files:
