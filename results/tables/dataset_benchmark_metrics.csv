@@ -1,0 +1,6 @@
+dataset,n_samples,n_features,baseline_accuracy,baseline_f1,encoded_match_rate,phe_match_rate,mean_phe_latency_ms,encrypted_request_size_bytes
+breast_cancer,569,30,0.9824561403508771,0.9861111111111112,1.0,1.0,167.65636799973436,9566
+iris_binary_0_1,100,4,1.0,1.0,1.0,1.0,23.51558999871486,1461
+wine_binary_0_vs_1_2,178,13,1.0,1.0,1.0,1.0,76.01801999961026,4265
+synthetic_50f_200s,200,50,0.725,0.7317073170731707,1.0,1.0,264.11954399954993,15808
+synthetic_100f_200s,200,100,0.65,0.65,1.0,1.0,523.5547720006434,31385

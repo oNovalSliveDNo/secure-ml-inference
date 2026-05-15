@@ -9,15 +9,16 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
 
 from app.client import Client
-from app.config import KEY_LENGTH, RANDOM_STATE, SCALE, TEST_SIZE
-from app.crypto import deserialize_ciphertext, serialize_ciphertext
+from app.config import KEY_LENGTH, RANDOM_STATE, SCALE, TEST_SIZE, THRESHOLD
+from app.crypto import decrypt_score, deserialize_ciphertext, serialize_ciphertext
 from app.data import load_dataset, split_dataset
-from app.encoding import encode_bias, encode_weights
+from app.encoding import decode_score, encode_bias, encode_weights, encoded_plaintext_score
 from app.model import extract_linear_params, load_model
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
@@ -28,7 +29,7 @@ st.set_page_config(page_title="Защищённый ML-инференс — Де
 MODEL_PATH = Path("results/models/model.pkl")
 TABLES_DIR = Path("results/tables")
 PLOTS_DIR = Path("results/plots")
-API_URL = os.getenv("API_URL", "http://api:8000")
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 
 def _extract_server_compute_ms(payload: dict[str, Any]) -> float | None:
@@ -172,7 +173,10 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
         enc_score = deserialize_ciphertext(client.public_key, encrypted_score_str)
         t3 = time.perf_counter()
 
-        pred_secure, prob_secure = client.decrypt_and_predict(enc_score)
+        score_int = decrypt_score(client.private_key, enc_score)
+        z_secure = decode_score(score_int=score_int, scale=SCALE)
+        prob_secure = float(1.0 / (1.0 + np.exp(-z_secure)))
+        pred_secure = int(prob_secure >= THRESHOLD)
         t4 = time.perf_counter()
 
         pred_baseline = int(model.predict(sample.to_numpy(dtype=float).reshape(1, -1))[0])
@@ -180,7 +184,10 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             model.predict_proba(sample.to_numpy(dtype=float).reshape(1, -1))[:, 1][0]
         )
 
-        pred_encoded = int(prob_secure >= 0.5)
+        w, b = extract_linear_params(model)
+        z_encoded = encoded_plaintext_score(x=x_scaled, w=w, b=b, scale=SCALE)
+        prob_encoded = float(1.0 / (1.0 + np.exp(-z_encoded)))
+        pred_encoded = int(prob_encoded >= THRESHOLD)
         payload_bytes = len(str(request_payload).encode("utf-8"))
         plaintext_bytes = len(sample.to_numpy(dtype=float).tobytes())
         overhead_ratio = payload_bytes / max(plaintext_bytes, 1)
@@ -191,8 +198,12 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             "x_int": x_int,
             "enc_x": enc_x,
             "encrypted_score": encrypted_score_str,
+            "score_int": score_int,
+            "z_secure": z_secure,
             "prob_secure": prob_secure,
             "pred_secure": pred_secure,
+            "z_encoded": z_encoded,
+            "prob_encoded": prob_encoded,
             "pred_encoded": pred_encoded,
             "pred_baseline": pred_baseline,
             "prob_baseline": prob_baseline,
@@ -281,33 +292,49 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
         )
 
     st.markdown("**Расшифровка и итог**")
-    st.write(
-        f"Расшифрованная оценка (score, сериализованное значение): `{result['encrypted_score'][:80]}...`"
+    decrypt_steps_df = pd.DataFrame(
+        [
+            {
+                "Этап": "Зашифрованный score (шифртекст)",
+                "Значение": f"{result['encrypted_score'][:80]}...",
+            },
+            {"Этап": "Расшифрованный score_int", "Значение": str(result["score_int"])},
+            {"Этап": "Декодированный z", "Значение": f"{result['z_secure']:.6f}"},
+            {"Этап": "Вероятность sigmoid(z)", "Значение": f"{result['prob_secure']:.6f}"},
+            {"Этап": "Предсказание", "Значение": str(result["pred_secure"])},
+        ]
     )
-    st.write(f"Сигмоида(score): **{result['prob_secure']:.6f}**")
-    st.write(f"Итоговый прогноз: **{result['pred_secure']}**")
+    st.dataframe(decrypt_steps_df, width="stretch")
 
     st.subheader("Шаг 3. Сравнение прогнозов")
     comparison_df = pd.DataFrame(
         [
             {
+                "Метод": "Baseline",
                 "Истинная метка": result["true_label"],
-                "Baseline": result["pred_baseline"],
-                "Encoded": result["pred_encoded"],
-                "PHE": result["pred_secure"],
-                "Совпадение Baseline/PHE": "Да"
-                if result["pred_baseline"] == result["pred_secure"]
-                else "Нет",
-            }
+                "Вероятность": result["prob_baseline"],
+                "Предсказание": result["pred_baseline"],
+            },
+            {
+                "Метод": "Encoded plaintext",
+                "Истинная метка": result["true_label"],
+                "Вероятность": result["prob_encoded"],
+                "Предсказание": result["pred_encoded"],
+            },
+            {
+                "Метод": "PHE inference",
+                "Истинная метка": result["true_label"],
+                "Вероятность": result["prob_secure"],
+                "Предсказание": result["pred_secure"],
+            },
         ]
     )
+    comparison_df["Вероятность"] = comparison_df["Вероятность"].map(lambda v: f"{float(v):.6f}")
+    comparison_df["Совпадение Baseline/PHE"] = (
+        "Да" if result["pred_baseline"] == result["pred_secure"] else "Нет"
+    )
 
-    def _highlight_match(row: pd.Series) -> list[str]:
-        ok = row["Совпадение Baseline/PHE"] == "Да"
-        color = "background-color: #d1fae5" if ok else "background-color: #fee2e2"
-        return ["", "", "", "", color]
-
-    st.dataframe(comparison_df.style.apply(_highlight_match, axis=1), width="stretch")
+    st.dataframe(comparison_df, width="stretch")
 
 
 def show_metrics_dashboard() -> None:
