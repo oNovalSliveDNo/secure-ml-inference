@@ -1,4 +1,5 @@
 @echo off
+set PYTHONPATH=%CD%;%PYTHONPATH%
 
 echo === Experiment 1: Learning the baseline model ===
 python experiments/01_train_baseline.py

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+export PYTHONPATH="${PWD}:${PYTHONPATH:-}"
 set -euo pipefail
 
 run_step() {
