@@ -210,6 +210,7 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             "true_label": int(y_test.iloc[sample_idx]),
             "status_code": status_code,
             "server_compute_ms": _extract_server_compute_ms(response_payload),
+            "request_payload": request_payload,
             "http_elapsed_ms": (request_ended - request_started) * 1000.0,
             "preprocess_ms": (t1 - t0) * 1000.0,
             "encrypt_ms": (t2 - t1) * 1000.0,
@@ -275,6 +276,33 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             }
         ]
     )
+    st.markdown("**Сообщение, отправляемое на сервер**")
+    request_payload = result["request_payload"]
+    request_preview = {
+        "public_key_n": f"{str(request_payload['public_key_n'])[:32]}...",
+        "encrypted_features": [
+            f"{cipher[:32]}..." for cipher in request_payload["encrypted_features"][:3]
+        ]
+        + (["..."] if len(request_payload["encrypted_features"]) > 3 else []),
+        "scale": request_payload["scale"],
+        "feature_count": request_payload["feature_count"],
+    }
+    st.json(request_preview)
+
+    st.info("Что НЕ отправляется: исходные признаки, закрытый ключ, расшифрованный score.")
+
+    st.markdown("**Ответ сервера**")
+    st.json(
+        {
+            "encrypted_score": f"{result['encrypted_score'][:48]}...",
+            "server_compute_ms": (
+                round(result["server_compute_ms"], 3)
+                if result["server_compute_ms"] is not None
+                else None
+            ),
+        }
+    )
+
     st.markdown("**HTTP-запрос и ответ сервера**")
     st.dataframe(http_df, width="stretch")
 
