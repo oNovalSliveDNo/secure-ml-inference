@@ -94,6 +94,14 @@ python experiments/07_benchmark_feature_scaling.py
 
 Результаты сохраняются в `results/tables/` и `results/plots/`.
 
+### Unit-тесты
+
+В репозитории есть unit-тесты для ключевых компонентов (кодирование, криптография, режимы инференса и API-контракты). Запуск:
+
+```bash
+pytest
+```
+
 ### Запуск сервера (FastAPI)
 
 ```bash

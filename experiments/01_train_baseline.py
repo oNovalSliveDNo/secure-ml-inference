@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
 from pathlib import Path
@@ -24,6 +25,9 @@ MODEL_PATH = MODELS_DIR / "model.pkl"
 SCALER_PATH = MODELS_DIR / "scaler.pkl"
 WEIGHTS_PATH = MODELS_DIR / "weights.json"
 METADATA_PATH = MODELS_DIR / "metadata.json"
+TABLES_DIR = Path("results/tables")
+QUALITY_CSV_PATH = TABLES_DIR / "quality_metrics.csv"
+CSV_HEADERS = ["mode", "accuracy", "precision", "recall", "f1", "roc_auc", "match_rate"]
 
 
 def _compute_metrics(y_true: Any, y_pred: Any, y_proba: Any) -> dict[str, float]:
@@ -44,6 +48,28 @@ def _compute_metrics(y_true: Any, y_pred: Any, y_proba: Any) -> dict[str, float]
         "f1": float(f1_score(y_true, y_pred)),
         "roc_auc": float(roc_auc_score(y_true, y_proba)),
     }
+
+
+def _write_baseline_quality_row(metrics: dict[str, float]) -> None:
+    """Write baseline quality metrics CSV with header and one row.
+
+    Args:
+        metrics: Baseline metric values.
+    """
+    TABLES_DIR.mkdir(parents=True, exist_ok=True)
+    row: dict[str, float | str] = {
+        "mode": "Plaintext baseline",
+        "accuracy": metrics["accuracy"],
+        "precision": metrics["precision"],
+        "recall": metrics["recall"],
+        "f1": metrics["f1"],
+        "roc_auc": metrics["roc_auc"],
+        "match_rate": 1.0,
+    }
+    with QUALITY_CSV_PATH.open("w", encoding="utf-8", newline="") as file_obj:
+        writer = csv.DictWriter(file_obj, fieldnames=CSV_HEADERS)
+        writer.writeheader()
+        writer.writerow(row)
 
 
 def main() -> None:
@@ -92,8 +118,10 @@ def main() -> None:
         json.dumps(metadata_payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    _write_baseline_quality_row(metrics)
 
     logger.info("Saved model artifacts to %s", MODELS_DIR)
+    logger.info("Saved baseline quality metrics to %s", QUALITY_CSV_PATH)
     logger.info("Baseline training completed.")
 
 
