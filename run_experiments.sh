@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+run_step() {
+  local title="$1"
+  local script="$2"
+
+  echo "=== ${title} ==="
+  python "$script"
+}
+
+run_step "Experiment 1: Learning the baseline model" "experiments/01_train_baseline.py"
+run_step "Experiment 2: Checking manual plaintext" "experiments/02_validate_manual_inference.py"
+run_step "Experiment 3: Encoded plaintext inference" "experiments/03_run_encoded_inference.py"
+run_step "Experiment 4: PHE inference" "experiments/04_run_phe_inference.py"
+run_step "Experiment 5: Time measurements (latency)" "experiments/05_benchmark_latency.py"
+run_step "Experiment 6: Payload measurements" "experiments/06_benchmark_payload.py"
+run_step "Experiment 7: Feature scaling" "experiments/07_benchmark_feature_scaling.py"
+run_step "Experiment 8: Benchmark by datasets" "experiments/08_benchmark_datasets.py"
+run_step "Experiment 9: Benchmark by key lengths" "experiments/09_benchmark_key_lengths.py"
+
+# === Long-running / optional experiments ===
+# To skip long steps, keep the lines below commented.
+# To enable, uncomment the corresponding run_step lines.
+
+# run_step "Experiment 10: Benchmark by scale (optional, long)" "experiments/10_benchmark_scale.py"
+# run_step "Experiment 11: API roundtrip benchmark (optional, long)" "experiments/11_benchmark_api_roundtrip.py"
+
+echo "All experiments have been successfully completed."
