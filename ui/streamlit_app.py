@@ -3,20 +3,22 @@
 
 from __future__ import annotations
 
+import os
 import time
 import warnings
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import requests
 import streamlit as st
 
 from app.client import Client
 from app.config import KEY_LENGTH, RANDOM_STATE, SCALE, TEST_SIZE
+from app.crypto import deserialize_ciphertext, serialize_ciphertext
 from app.data import load_dataset, split_dataset
 from app.encoding import encode_bias, encode_weights
 from app.model import extract_linear_params, load_model
-from app.server import Server
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
@@ -26,6 +28,7 @@ st.set_page_config(page_title="Защищённый ML-инференс — Де
 MODEL_PATH = Path("results/models/model.pkl")
 TABLES_DIR = Path("results/tables")
 PLOTS_DIR = Path("results/plots")
+API_URL = os.getenv("API_URL", "http://api:8000")
 
 st.set_page_config(page_title="Защищённый ML-инференс — Демонстрация", layout="wide")
 
@@ -83,13 +86,12 @@ def show_demo_inference(resources: dict[str, Any]) -> None:
     sample = x_test.iloc[sample_idx]
 
     st.subheader("Исходные признаки пациента")
-    st.dataframe(pd.DataFrame({"Признак": sample.index, "Значение": sample.values}), width='stretch')
+    st.dataframe(
+        pd.DataFrame({"Признак": sample.index, "Значение": sample.values}), width="stretch"
+    )
 
     if st.button("Запустить защищённый инференс", type="primary"):
         client = Client(scaler=resources["scaler"], scale=SCALE, key_length=KEY_LENGTH)
-        server = Server(
-            w_int=resources["w_int"], b_int=resources["b_int"], public_key=client.public_key
-        )
 
         t0 = time.perf_counter()
         x_scaled = client.preprocess(sample.to_numpy(dtype=float).reshape(1, -1))
@@ -99,7 +101,31 @@ def show_demo_inference(resources: dict[str, Any]) -> None:
         enc_x = client.encrypt(x_int)
         t2 = time.perf_counter()
 
-        enc_score = server.compute_encrypted_score(enc_x)
+        request_payload: dict[str, Any] = {
+            "public_key_n": str(client.public_key.n),
+            "encrypted_features": [serialize_ciphertext(value) for value in enc_x],
+            "scale": SCALE,
+            "feature_count": len(enc_x),
+        }
+
+        try:
+            response = requests.post(
+                f"{API_URL}/infer/encrypted",
+                json=request_payload,
+                timeout=30,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            st.error(f"Ошибка при обращении к API ({API_URL}): {exc}")
+            return
+
+        response_payload = response.json()
+        encrypted_score_str = response_payload.get("encrypted_score")
+        if not isinstance(encrypted_score_str, str):
+            st.error("Некорректный ответ API: отсутствует поле encrypted_score.")
+            return
+
+        enc_score = deserialize_ciphertext(client.public_key, encrypted_score_str)
         t3 = time.perf_counter()
 
         pred_secure, prob_secure = client.decrypt_and_predict(enc_score)
@@ -113,12 +139,20 @@ def show_demo_inference(resources: dict[str, Any]) -> None:
         st.subheader("Выполнение протокола")
         c1, c2, c3 = st.columns(3)
         c1.metric("Количество зашифрованных признаков", len(enc_x))
-        c2.metric("Суммарная длина шифртекстов (симв.)", sum(len(str(value.ciphertext())) for value in enc_x))
+        c2.metric(
+            "Суммарная длина шифртекстов (симв.)",
+            sum(len(str(value.ciphertext())) for value in enc_x),
+        )
         c3.metric("Общее время протокола (мс)", f"{(t4 - t0) * 1000.0:.2f}")
 
         timing_df = pd.DataFrame(
             {
-                "Этап": ["Предобработка + кодирование", "Шифрование", "Вычисление на сервере", "Расшифрование и прогноз"],
+                "Этап": [
+                    "Предобработка + кодирование",
+                    "Шифрование",
+                    "Вычисление на сервере",
+                    "Расшифрование и прогноз",
+                ],
                 "Время (мс)": [
                     (t1 - t0) * 1000.0,
                     (t2 - t1) * 1000.0,
@@ -127,7 +161,7 @@ def show_demo_inference(resources: dict[str, Any]) -> None:
                 ],
             }
         )
-        st.dataframe(timing_df, width='stretch')
+        st.dataframe(timing_df, width="stretch")
 
         st.subheader("Результат прогнозирования")
         st.write(f"**Истинная метка:** {int(y_test.iloc[sample_idx])}")
@@ -171,8 +205,8 @@ def show_protocol_view(resources: dict[str, Any]) -> None:
         }
     )
     left, right = st.columns(2)
-    left.dataframe(client_table, width='stretch')
-    right.dataframe(server_table, width='stretch')
+    left.dataframe(client_table, width="stretch")
+    right.dataframe(server_table, width="stretch")
 
     demo_sample = resources["x_test"].iloc[0].to_numpy(dtype=float)
     client = Client(scaler=resources["scaler"], scale=SCALE, key_length=KEY_LENGTH)
@@ -191,11 +225,13 @@ def show_metrics_dashboard() -> None:
     csv_files = sorted(TABLES_DIR.glob("*.csv"))
 
     if not csv_files:
-        st.info("CSV-файлы с метриками не найдены в results/tables/. Сначала запустите эксперименты № 04-07.")
+        st.info(
+            "CSV-файлы с метриками не найдены в results/tables/. Сначала запустите эксперименты № 04-07."
+        )
 
     for csv_file in csv_files:
         st.subheader(csv_file.name)
-        st.dataframe(pd.read_csv(csv_file), width='stretch')
+        st.dataframe(pd.read_csv(csv_file), width="stretch")
 
     plot_files = sorted(PLOTS_DIR.glob("*.png"))
 
@@ -204,7 +240,7 @@ def show_metrics_dashboard() -> None:
 
     for plot_file in plot_files:
         st.subheader(plot_file.name)
-        st.image(str(plot_file), width='stretch')
+        st.image(str(plot_file), width="stretch")
 
 
 def show_architecture() -> None:
