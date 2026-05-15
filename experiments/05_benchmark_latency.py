@@ -32,6 +32,7 @@ STAGES = [
     "preprocessing",
     "encoding",
     "key_generation",
+    "server_init",
     "encryption",
     "server_compute",
     "decryption",
@@ -110,7 +111,10 @@ def main() -> None:
         t1 = time.perf_counter()
         measurements["key_generation"].append(_to_ms(t0, t1))
 
+        t0 = time.perf_counter()
         server = Server(w_int=w_int, b_int=b_int, public_key=public_key)
+        t1 = time.perf_counter()
+        measurements["server_init"].append(_to_ms(t0, t1))
 
         t0 = time.perf_counter()
         enc_x = encrypt_vector(public_key=public_key, x_int=[int(v) for v in x_int.tolist()])
@@ -134,13 +138,10 @@ def main() -> None:
         t1 = time.perf_counter()
         measurements["sigmoid_threshold"].append(_to_ms(t0, t1))
 
-        total_without_keygen_ms = (
-            measurements["preprocessing"][-1]
-            + measurements["encoding"][-1]
-            + measurements["encryption"][-1]
-            + measurements["server_compute"][-1]
-            + measurements["decryption"][-1]
-            + measurements["sigmoid_threshold"][-1]
+        total_without_keygen_ms = sum(
+            measurements[stage][-1]
+            for stage in STAGES
+            if stage not in {"key_generation", "total_without_keygen", "total"}
         )
         measurements["total_without_keygen"].append(total_without_keygen_ms)
 

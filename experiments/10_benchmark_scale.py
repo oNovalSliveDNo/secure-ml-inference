@@ -11,14 +11,9 @@ import numpy as np
 
 from app.client import Client
 from app.config import RANDOM_STATE, TEST_SIZE
-from app.encoding import encode_bias, encode_weights
-from app.inference import (
-    encoded_plaintext_inference,
-    manual_plaintext_inference,
-    phe_inference_batch,
-    plaintext_inference,
-)
-from app.model import extract_linear_params, load_model
+from app.encoding import encode_bias, encode_weights, encoded_plaintext_score
+from app.inference import encoded_plaintext_inference, phe_inference_batch, plaintext_inference
+from app.model import compute_manual_score, extract_linear_params, load_model
 from app.server import Server
 
 logger = logging.getLogger(__name__)
@@ -53,21 +48,24 @@ def main() -> None:
     w, b = extract_linear_params(model)
     x_scaled = scaler.transform(x_test.to_numpy())
 
-    _, manual_prob = manual_plaintext_inference(x_scaled=x_scaled, w=w, b=b)
-    manual_scores = np.log(manual_prob / (1.0 - manual_prob))
+    # Compare linear score before sigmoid to avoid numerical instability near 0/1 probabilities.
+    manual_scores = compute_manual_score(x=x_scaled, w=w, b=b)
 
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
     rows: list[dict[str, float | int]] = []
 
     for scale in SCALE_VALUES:
-        encoded_pred, encoded_prob = encoded_plaintext_inference(
+        encoded_pred, _ = encoded_plaintext_inference(
             x_scaled=x_scaled,
             w=w,
             b=b,
             scale=scale,
             threshold=0.5,
         )
-        encoded_scores = np.log(encoded_prob / (1.0 - encoded_prob))
+        encoded_scores = np.asarray(
+            [encoded_plaintext_score(x=sample, w=w, b=b, scale=scale) for sample in x_scaled],
+            dtype=np.float64,
+        )
 
         encoded_match_rate = float(np.mean(encoded_pred == baseline_pred))
         mean_abs_score_error = float(np.mean(np.abs(encoded_scores - manual_scores)))

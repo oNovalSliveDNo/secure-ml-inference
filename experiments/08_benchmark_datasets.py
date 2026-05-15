@@ -16,7 +16,7 @@ from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 
 from app.client import Client
-from app.config import RANDOM_STATE, SCALE, TEST_SIZE
+from app.config import KEY_LENGTH, RANDOM_STATE, SCALE, TEST_SIZE
 from app.encoding import encode_bias, encode_weights
 from app.inference import encoded_plaintext_inference, phe_inference_batch, plaintext_inference
 from app.model import extract_linear_params, train_baseline_model
@@ -28,10 +28,11 @@ logging.basicConfig(level=logging.INFO)
 TABLES_DIR = Path("results/tables")
 DATASET_BENCHMARK_CSV_PATH = TABLES_DIR / "dataset_benchmark_metrics.csv"
 PHE_SUBSET_SIZE = 25
-PHE_KEY_LENGTH = 512
+KEY_LENGTH_FOR_BENCHMARK = KEY_LENGTH
 
 CSV_HEADERS = [
     "dataset",
+    "key_length",
     "n_samples",
     "n_features",
     "baseline_accuracy",
@@ -174,7 +175,7 @@ def _benchmark_one_dataset(
     )
     encoded_match_rate = float(np.mean(encoded_pred == baseline_pred))
 
-    client = Client(scaler=scaler, scale=SCALE, key_length=PHE_KEY_LENGTH)
+    client = Client(scaler=scaler, scale=SCALE, key_length=KEY_LENGTH_FOR_BENCHMARK)
     server = Server(
         w_int=encode_weights(w=w, scale=SCALE),
         b_int=encode_bias(b=b, scale=SCALE),
@@ -205,6 +206,7 @@ def _benchmark_one_dataset(
 
     return {
         "dataset": dataset_name,
+        "key_length": KEY_LENGTH_FOR_BENCHMARK,
         "n_samples": int(features.shape[0]),
         "n_features": int(features.shape[1]),
         "baseline_accuracy": baseline_accuracy,
