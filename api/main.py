@@ -22,8 +22,6 @@ MODEL_PATH = "results/models/model.pkl"
 
 app = FastAPI(title="Secure ML Inference API")
 
-# Server-side encoded model parameters are immutable after startup.
-
 
 @app.on_event("startup")
 async def startup_event() -> None:
@@ -37,10 +35,8 @@ async def startup_event() -> None:
     dataset = load_breast_cancer()
     class_names = [str(label) for label in dataset.target_names]
 
-    bootstrap_key, _ = paillier.generate_paillier_keypair(n_length=1024)
-    server = Server(w_int=w_int, b_int=b_int, public_key=bootstrap_key)
-
-    app.state.server = server
+    app.state.w_int = w_int
+    app.state.b_int = b_int
     app.state.feature_count = int(w_int.shape[0])
     app.state.classes = class_names
 
@@ -69,18 +65,17 @@ async def model_info() -> dict[str, object]:
 @app.post("/infer/encrypted", response_model=EncryptedInferResponse)
 async def infer_encrypted(request: EncryptedInferRequest) -> EncryptedInferResponse:
     """Compute encrypted linear score from encrypted feature vector."""
-    if not hasattr(app.state, "server") or app.state.server is None:
+    if not hasattr(app.state, "w_int") or not hasattr(app.state, "b_int"):
         raise HTTPException(status_code=503, detail="Server is not initialized")
-
-    server = app.state.server
-    if not isinstance(server, Server):
-        raise HTTPException(status_code=500, detail="Invalid server state")
 
     if request.feature_count != len(request.encrypted_features):
         raise HTTPException(status_code=400, detail="feature_count does not match payload")
 
     if request.feature_count != int(app.state.feature_count):
         raise HTTPException(status_code=400, detail="feature_count does not match model")
+
+    if request.scale != SCALE:
+        raise HTTPException(status_code=400, detail="scale does not match server configuration")
 
     try:
         public_key = paillier.PaillierPublicKey(n=int(request.public_key_n))
@@ -91,11 +86,14 @@ async def infer_encrypted(request: EncryptedInferRequest) -> EncryptedInferRespo
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"Invalid encrypted payload: {exc}") from exc
 
-    server.public_key = public_key
-    server.enc_b = public_key.encrypt(server.b_int)
+    request_server = Server(
+        w_int=app.state.w_int,
+        b_int=app.state.b_int,
+        public_key=public_key,
+    )
 
     start = time.perf_counter()
-    encrypted_score = server.compute_encrypted_score(enc_x=encrypted_features)
+    encrypted_score = request_server.compute_encrypted_score(enc_x=encrypted_features)
     compute_ms = (time.perf_counter() - start) * 1000.0
 
     return EncryptedInferResponse(
