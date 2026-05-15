@@ -1,0 +1,151 @@
+# experiments/09_benchmark_key_lengths.py
+"""Experiment 09: Benchmark Paillier key lengths on one Breast Cancer sample."""
+
+from __future__ import annotations
+
+import csv
+import json
+import logging
+import time
+from pathlib import Path
+
+import numpy as np
+
+from app.config import N_BENCHMARK_RUNS, RANDOM_STATE, SCALE, TEST_SIZE
+from app.crypto import decrypt_score, encrypt_vector, generate_keys
+from app.data import load_dataset, split_dataset
+from app.encoding import encode_bias, encode_vector, encode_weights
+from app.model import extract_linear_params, load_model
+from app.server import Server
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+MODEL_PATH = Path("results/models/model.pkl")
+TABLES_DIR = Path("results/tables")
+KEY_LENGTH_CSV_PATH = TABLES_DIR / "key_length_metrics.csv"
+KEY_LENGTHS = [512, 1024, 2048]  # 512-bit is INSECURE demo mode only.
+
+CSV_HEADERS = [
+    "key_length",
+    "keygen_ms_mean",
+    "encryption_ms_mean",
+    "server_ms_mean",
+    "decryption_ms_mean",
+    "total_with_keygen_ms_mean",
+    "total_without_keygen_ms_mean",
+    "request_size_bytes_mean",
+]
+
+
+def _mean(values: list[float]) -> float:
+    """Compute mean value for a list."""
+    return float(np.mean(np.asarray(values, dtype=np.float64)))
+
+
+def _summarize(values: list[float]) -> tuple[float, float, float]:
+    """Compute mean, std, and median for measured values."""
+    arr = np.asarray(values, dtype=np.float64)
+    return float(np.mean(arr)), float(np.std(arr)), float(np.median(arr))
+
+
+def main() -> None:
+    """Run key-length benchmark and save summary table."""
+    model = load_model(str(MODEL_PATH))
+    features, target = load_dataset()
+    _, x_test, _, _ = split_dataset(
+        features=features,
+        target=target,
+        test_size=TEST_SIZE,
+        random_state=RANDOM_STATE,
+    )
+
+    scaler = model.named_steps["scaler"]
+    w, b = extract_linear_params(model)
+    w_int = encode_weights(w=w, scale=SCALE)
+    b_int = encode_bias(b=b, scale=SCALE)
+
+    sample = x_test.to_numpy()[0]
+    x_scaled = scaler.transform(sample.reshape(1, -1))[0]
+    encoded_sample = [int(v) for v in encode_vector(x=x_scaled, scale=SCALE).tolist()]
+
+    TABLES_DIR.mkdir(parents=True, exist_ok=True)
+
+    rows: list[dict[str, float | int]] = []
+
+    for key_length in KEY_LENGTHS:
+        keygen_ms_values: list[float] = []
+        encryption_ms_values: list[float] = []
+        server_ms_values: list[float] = []
+        decryption_ms_values: list[float] = []
+        total_with_keygen_ms_values: list[float] = []
+        total_without_keygen_ms_values: list[float] = []
+        request_sizes: list[float] = []
+
+        for _ in range(N_BENCHMARK_RUNS):
+            t_total_start = time.perf_counter()
+
+            t0 = time.perf_counter()
+            public_key, private_key = generate_keys(n_length=key_length)
+            t1 = time.perf_counter()
+            keygen_ms_values.append((t1 - t0) * 1000.0)
+
+            server = Server(w_int=w_int, b_int=b_int, public_key=public_key)
+
+            t0 = time.perf_counter()
+            encrypted_vector = encrypt_vector(public_key=public_key, x_int=encoded_sample)
+            t1 = time.perf_counter()
+            encryption_ms_values.append((t1 - t0) * 1000.0)
+
+            request_payload = {
+                "encrypted_features": [str(value.ciphertext()) for value in encrypted_vector],
+                "public_key_n": str(public_key.n),
+                "scale": SCALE,
+            }
+            request_sizes.append(float(len(json.dumps(request_payload).encode("utf-8"))))
+
+            t0 = time.perf_counter()
+            encrypted_score = server.compute_encrypted_score(encrypted_vector)
+            t1 = time.perf_counter()
+            server_ms_values.append((t1 - t0) * 1000.0)
+
+            t0 = time.perf_counter()
+            _ = decrypt_score(private_key=private_key, encrypted_score=encrypted_score)
+            t1 = time.perf_counter()
+            decryption_ms_values.append((t1 - t0) * 1000.0)
+
+            t_total_end = time.perf_counter()
+            total_with_keygen_ms_values.append((t_total_end - t_total_start) * 1000.0)
+            total_without_keygen_ms_values.append(
+                encryption_ms_values[-1] + server_ms_values[-1] + decryption_ms_values[-1]
+            )
+
+        logger.info("Key length %d bits benchmarked.", key_length)
+        logger.info("  keygen mean/std/median: %s", _summarize(keygen_ms_values))
+        logger.info("  encryption mean/std/median: %s", _summarize(encryption_ms_values))
+        logger.info("  server mean/std/median: %s", _summarize(server_ms_values))
+        logger.info("  decryption mean/std/median: %s", _summarize(decryption_ms_values))
+
+        rows.append(
+            {
+                "key_length": key_length,
+                "keygen_ms_mean": _mean(keygen_ms_values),
+                "encryption_ms_mean": _mean(encryption_ms_values),
+                "server_ms_mean": _mean(server_ms_values),
+                "decryption_ms_mean": _mean(decryption_ms_values),
+                "total_with_keygen_ms_mean": _mean(total_with_keygen_ms_values),
+                "total_without_keygen_ms_mean": _mean(total_without_keygen_ms_values),
+                "request_size_bytes_mean": _mean(request_sizes),
+            }
+        )
+
+    with KEY_LENGTH_CSV_PATH.open("w", encoding="utf-8", newline="") as file_obj:
+        writer = csv.DictWriter(file_obj, fieldnames=CSV_HEADERS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    logger.info("Saved key-length metrics to %s", KEY_LENGTH_CSV_PATH)
+
+
+if __name__ == "__main__":
+    main()
