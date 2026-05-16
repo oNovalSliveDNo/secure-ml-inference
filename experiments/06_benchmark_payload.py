@@ -56,6 +56,7 @@ def main() -> None:
     encrypted_request = {
         "public_key_n": str(client.public_key.n),
         "encrypted_features": [serialize_ciphertext(value) for value in enc_x],
+        "feature_count": len(enc_x),
         "scale": SCALE,
     }
 
