@@ -45,8 +45,13 @@ echo === Experiment 10: Benchmark by scale ===
 python experiments/10_benchmark_scale.py
 if %errorlevel% neq 0 exit /b %errorlevel%
 
-echo === Experiment 11: API roundtrip benchmark ===
-python experiments/11_benchmark_api_roundtrip.py
-if %errorlevel% neq 0 exit /b %errorlevel%
+REM experiment 11 requires a running FastAPI server; run manually after starting uvicorn
+REM echo === Experiment 11: API roundtrip benchmark ===
+REM python experiments/11_benchmark_api_roundtrip.py
+REM if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo All experiments have been successfully completed.
+echo To run API roundtrip benchmark (experiment 11), first start the API:
+echo   uvicorn api.main:app --host 0.0.0.0 --port 8000
+echo Then run:
+echo   python experiments/11_benchmark_api_roundtrip.py

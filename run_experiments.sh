@@ -25,6 +25,11 @@ run_step "Experiment 9: Benchmark by key lengths" "experiments/09_benchmark_key_
 # To enable, uncomment the corresponding run_step lines.
 
 run_step "Experiment 10: Benchmark by scale" "experiments/10_benchmark_scale.py"
-run_step "Experiment 11: API roundtrip benchmark" "experiments/11_benchmark_api_roundtrip.py"
+# experiment 11 requires a running FastAPI server; run manually after starting uvicorn
+# run_step "Experiment 11: API roundtrip benchmark" "experiments/11_benchmark_api_roundtrip.py"
 
 echo "All experiments have been successfully completed."
+echo "To run API roundtrip benchmark (experiment 11), first start the API:"
+echo "  uvicorn api.main:app --host 0.0.0.0 --port 8000"
+echo "Then run:"
+echo "  python experiments/11_benchmark_api_roundtrip.py"
