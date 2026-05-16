@@ -3,6 +3,8 @@
 
 import logging
 import time
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 import phe as paillier
 from fastapi import FastAPI, HTTPException
@@ -20,11 +22,9 @@ logger = logging.getLogger(__name__)
 
 MODEL_PATH = "results/models/model.pkl"
 
-app = FastAPI(title="Secure ML Inference API")
 
-
-@app.on_event("startup")
-async def startup_event() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Load model artifacts and initialize encrypted inference server state."""
     pipeline = load_model(MODEL_PATH)
     weights, bias = extract_linear_params(pipeline=pipeline)
@@ -45,6 +45,10 @@ async def startup_event() -> None:
         app.state.feature_count,
         class_names,
     )
+    yield  # точка разделения startup / shutdown (shutdown не требуется)
+
+
+app = FastAPI(title="Secure ML Inference API", lifespan=lifespan)
 
 
 @app.get("/health")

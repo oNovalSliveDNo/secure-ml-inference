@@ -72,6 +72,7 @@ ignore = [
     "S101",     # assert (разрешены в экспериментах)
     "N806",     # Переменные в функции должны быть в стиле lowercase
     "RUF001",   # Строка содержит неоднозначную `с` (КИРИЛЛИЧЕСКАЯ СТРОЧНАЯ БУКВА ES). Вы имели в виду `c` (ЛАТИНСКАЯ СТРОЧНАЯ БУКВА C)?
+    "RUF002",   # Docstring contains ambiguous `с` (CYRILLIC SMALL LETTER ES). Did you mean `c` (LATIN SMALL LETTER C)?
     "RUF003"    # Comment contains ambiguous `В` (CYRILLIC CAPITAL LETTER VE). Did you mean `B` (LATIN CAPITAL LETTER B)?
 ]
 exclude = [
