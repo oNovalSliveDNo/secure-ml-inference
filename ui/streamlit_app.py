@@ -116,6 +116,7 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     x_test = resources["x_test"]
     y_test = resources["y_test"]
     model = resources["model"]
+    label_names = {0: "malignant (злокачественная)", 1: "benign (доброкачественная)"}
 
     sample_idx = st.slider("Шаг 1. Выберите индекс тестового образца", 0, len(x_test) - 1, 0)
     sample = x_test.iloc[sample_idx]
@@ -328,6 +329,7 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
         )
 
     st.markdown("**Расшифровка и итог**")
+    true_label_value = int(y_test.iloc[int(result["sample_idx"])])
     decrypt_steps_df = pd.DataFrame(
         [
             {
@@ -337,31 +339,41 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             {"Этап": "Расшифрованный score_int", "Значение": str(result["score_int"])},
             {"Этап": "Декодированный z", "Значение": f"{result['z_secure']:.6f}"},
             {"Этап": "Вероятность sigmoid(z)", "Значение": f"{result['prob_secure']:.6f}"},
-            {"Этап": "Предсказание", "Значение": str(result["pred_secure"])},
+            {
+                "Этап": "Предсказание",
+                "Значение": f"{label_names[result['pred_secure']]} (class={result['pred_secure']})",
+            },
         ]
     )
     st.dataframe(decrypt_steps_df, width="stretch")
+    st.caption("Вероятность sigmoid(z) — это вероятность класса 1 (benign / доброкачественная).")
 
     st.subheader("Шаг 3. Сравнение прогнозов")
     comparison_df = pd.DataFrame(
         [
             {
                 "Метод": "Baseline",
-                "Истинная метка": result["true_label"],
+                "Истинная метка": f"{label_names[true_label_value]} (class={true_label_value})",
                 "Вероятность": result["prob_baseline"],
-                "Предсказание": result["pred_baseline"],
+                "Предсказание": (
+                    f"{label_names[result['pred_baseline']]} (class={result['pred_baseline']})"
+                ),
             },
             {
                 "Метод": "Encoded plaintext",
-                "Истинная метка": result["true_label"],
+                "Истинная метка": f"{label_names[true_label_value]} (class={true_label_value})",
                 "Вероятность": result["prob_encoded"],
-                "Предсказание": result["pred_encoded"],
+                "Предсказание": (
+                    f"{label_names[result['pred_encoded']]} (class={result['pred_encoded']})"
+                ),
             },
             {
                 "Метод": "PHE inference",
-                "Истинная метка": result["true_label"],
+                "Истинная метка": f"{label_names[true_label_value]} (class={true_label_value})",
                 "Вероятность": result["prob_secure"],
-                "Предсказание": result["pred_secure"],
+                "Предсказание": (
+                    f"{label_names[result['pred_secure']]} (class={result['pred_secure']})"
+                ),
             },
         ]
     )

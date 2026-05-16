@@ -9,6 +9,7 @@ import logging
 import time
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from app.config import N_BENCHMARK_RUNS, RANDOM_STATE, SCALE, TEST_SIZE
@@ -23,7 +24,9 @@ logging.basicConfig(level=logging.INFO)
 
 MODEL_PATH = Path("results/models/model.pkl")
 TABLES_DIR = Path("results/tables")
+PLOTS_DIR = Path("results/plots")
 KEY_LENGTH_CSV_PATH = TABLES_DIR / "key_length_metrics.csv"
+KEY_LENGTH_PLOT_PATH = PLOTS_DIR / "key_length_comparison.png"
 KEY_LENGTHS = [512, 1024, 2048]  # 512-bit is INSECURE demo mode only.
 
 CSV_HEADERS = [
@@ -71,6 +74,7 @@ def main() -> None:
     encoded_sample = [int(v) for v in encode_vector(x=x_scaled, scale=SCALE).tolist()]
 
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict[str, float | int]] = []
 
@@ -155,6 +159,43 @@ def main() -> None:
         writer.writerows(rows)
 
     logger.info("Saved key-length metrics to %s", KEY_LENGTH_CSV_PATH)
+
+    key_lengths = [int(row["key_length"]) for row in rows]
+    total_with_keygen = [float(row["total_with_keygen_ms_mean"]) for row in rows]
+    total_without_keygen = [float(row["total_without_keygen_ms_mean"]) for row in rows]
+    encryption_time = [float(row["encryption_ms_mean"]) for row in rows]
+    request_size = [float(row["request_size_bytes_mean"]) for row in rows]
+
+    fig, axis_left = plt.subplots(figsize=(9, 5))
+    axis_right = axis_left.twinx()
+
+    axis_left.plot(key_lengths, total_with_keygen, marker="o", label="Total with keygen (ms)")
+    axis_left.plot(key_lengths, total_without_keygen, marker="o", label="Total without keygen (ms)")
+    axis_left.plot(key_lengths, encryption_time, marker="o", label="Encryption time (ms)")
+    axis_right.plot(
+        key_lengths,
+        request_size,
+        marker="s",
+        linestyle="--",
+        color="tab:purple",
+        label="Request size (bytes)",
+    )
+
+    axis_left.set_title("Key Length Benchmark Comparison")
+    axis_left.set_xlabel("Key length (bits)")
+    axis_left.set_ylabel("Time (ms)")
+    axis_right.set_ylabel("Request size (bytes)")
+    axis_left.set_xticks(key_lengths)
+    axis_left.grid(True, alpha=0.3)
+
+    left_handles, left_labels = axis_left.get_legend_handles_labels()
+    right_handles, right_labels = axis_right.get_legend_handles_labels()
+    axis_left.legend(left_handles + right_handles, left_labels + right_labels, loc="upper left")
+
+    fig.tight_layout()
+    fig.savefig(KEY_LENGTH_PLOT_PATH, dpi=160)
+    plt.close(fig)
+    logger.info("Saved key-length plot to %s", KEY_LENGTH_PLOT_PATH)
 
 
 if __name__ == "__main__":

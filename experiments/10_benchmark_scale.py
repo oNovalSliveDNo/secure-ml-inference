@@ -7,6 +7,7 @@ import csv
 import logging
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from app.client import Client
@@ -21,7 +22,9 @@ logging.basicConfig(level=logging.INFO)
 
 MODEL_PATH = Path("results/models/model.pkl")
 TABLES_DIR = Path("results/tables")
+PLOTS_DIR = Path("results/plots")
 SCALE_CSV_PATH = TABLES_DIR / "scale_metrics.csv"
+SCALE_PLOT_PATH = PLOTS_DIR / "scale_impact.png"
 SCALE_VALUES = [100, 1000, 10000, 100000]
 PHE_SUBSET_SIZE = 15
 PHE_KEY_LENGTH = 512
@@ -52,6 +55,7 @@ def main() -> None:
     manual_scores = compute_manual_score(x=x_scaled, w=w, b=b)
 
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     rows: list[dict[str, float | int]] = []
 
     for scale in SCALE_VALUES:
@@ -104,6 +108,42 @@ def main() -> None:
         writer.writerows(rows)
 
     logger.info("Saved scale metrics to %s", SCALE_CSV_PATH)
+
+    scales = [int(row["scale"]) for row in rows]
+    encoded_match_rates = [float(row["encoded_match_rate"]) for row in rows]
+    mean_abs_errors = [float(row["mean_abs_score_error"]) for row in rows]
+
+    fig, axis_left = plt.subplots(figsize=(9, 5))
+    axis_right = axis_left.twinx()
+
+    axis_left.plot(scales, encoded_match_rates, marker="o", color="tab:blue", label="Match rate")
+    axis_right.plot(
+        scales,
+        mean_abs_errors,
+        marker="s",
+        linestyle="--",
+        color="tab:red",
+        label="Mean absolute score error",
+    )
+
+    axis_left.set_title("Impact of SCALE on Encoded Inference")
+    axis_left.set_xlabel("SCALE")
+    axis_left.set_ylabel("Match rate")
+    axis_right.set_ylabel("Mean absolute score error")
+    axis_left.set_xscale("log")
+    axis_left.set_xticks(scales)
+    axis_left.set_xticklabels([str(scale) for scale in scales])
+    axis_left.set_ylim(0.0, 1.02)
+    axis_left.grid(True, alpha=0.3)
+
+    left_handles, left_labels = axis_left.get_legend_handles_labels()
+    right_handles, right_labels = axis_right.get_legend_handles_labels()
+    axis_left.legend(left_handles + right_handles, left_labels + right_labels, loc="lower right")
+
+    fig.tight_layout()
+    fig.savefig(SCALE_PLOT_PATH, dpi=160)
+    plt.close(fig)
+    logger.info("Saved scale plot to %s", SCALE_PLOT_PATH)
 
 
 if __name__ == "__main__":
