@@ -66,7 +66,7 @@ Always adhere to these rules when generating, modifying, or reviewing code.
 - The API must not store any client state; it should be stateless across requests.
 
 ## Experiments & Results
-- All experiment scripts are in `experiments/` and numbered 01–07.
+- All experiment scripts are in `experiments/` and numbered 01–11.
 - Each script:
   - Is self-contained (can be run independently after baseline training).
   - Loads model/scaler from `results/models/` using functions from `app/model.py`.
@@ -100,10 +100,14 @@ This is the recommended sequence to implement the project incrementally and safe
 12. `experiments/05_benchmark_latency.py`
 13. `experiments/06_benchmark_payload.py`
 14. `experiments/07_benchmark_feature_scaling.py`
-15. `api/main.py`
-16. `ui/streamlit_app.py`
-17. `Dockerfile` and `docker-compose.yml` (if not already complete)
-18. Finalize `README.md`, polish documentation.
+15. `experiments/08_benchmark_datasets.py`
+16. `experiments/09_benchmark_key_lengths.py`
+17. `experiments/10_benchmark_scale.py`
+18. `experiments/11_benchmark_api_roundtrip.py`
+19. `api/main.py`
+20. `ui/streamlit_app.py`
+21. `Dockerfile` and `docker-compose.yml` (if not already complete)
+22. Finalize `README.md`, polish documentation.
 
 ## AI Interaction Mode
 - The AI should always refer to this file (`AI_CONTEXT.md`) as the source of truth for project rules.

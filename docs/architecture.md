@@ -70,7 +70,22 @@
 
 ### 4. `experiments/` — скрипты воспроизводимых экспериментов
 
-Семь пронумерованных скриптов, реализующих протокол экспериментов из `docs/experiment_protocol.md`. Каждый скрипт независим и сохраняет результаты в `results/`.
+Одиннадцать пронумерованных скриптов, реализующих протокол экспериментов из `docs/experiment_protocol.md`. Каждый скрипт независим и сохраняет результаты в `results/`.
+
+- **01–04: качество и корректность**
+  - `01_train_baseline.py`
+  - `02_validate_manual_inference.py`
+  - `03_run_encoded_inference.py`
+  - `04_run_phe_inference.py`
+- **05–07: latency, payload, feature scaling**
+  - `05_benchmark_latency.py`
+  - `06_benchmark_payload.py`
+  - `07_benchmark_feature_scaling.py`
+- **08–11: dataset benchmark, key length, scale, API roundtrip**
+  - `08_benchmark_datasets.py`
+  - `09_benchmark_key_lengths.py`
+  - `10_benchmark_scale.py`
+  - `11_benchmark_api_roundtrip.py`
 
 ### 5. `results/` — генерируемые артефакты
 

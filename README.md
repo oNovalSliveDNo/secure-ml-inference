@@ -83,6 +83,26 @@ python experiments/01_train_baseline.py
 
 ### Запуск экспериментов
 
+> ⚠️ Если запускать отдельные скрипты напрямую (`python experiments/...`), возможна ошибка импорта
+> `ModuleNotFoundError: No module named 'app'`, если не задан `PYTHONPATH`.
+
+Перед запуском отдельных экспериментов установите `PYTHONPATH` в корень репозитория:
+
+- Linux/macOS:
+  ```bash
+  export PYTHONPATH="$PWD"
+  ```
+- Windows (PowerShell):
+  ```powershell
+  $env:PYTHONPATH = "."
+  ```
+- Windows (cmd.exe):
+  ```bat
+  set PYTHONPATH=%CD%
+  ```
+
+Рекомендуемый способ запуска — пакетные скрипты `run_experiments.sh` / `run_experiments.bat`: они уже выставляют `PYTHONPATH` автоматически.
+
 ```bash
 python experiments/01_train_baseline.py
 python experiments/02_validate_manual_inference.py
@@ -95,6 +115,12 @@ python experiments/08_benchmark_datasets.py
 python experiments/09_benchmark_key_lengths.py
 python experiments/10_benchmark_scale.py
 python experiments/11_benchmark_api_roundtrip.py
+```
+
+Альтернатива (запуск как модуля, также требует запуска из корня проекта):
+
+```bash
+python -m experiments.01_train_baseline
 ```
 
 Результаты сохраняются в `results/tables/` и `results/plots/`.
