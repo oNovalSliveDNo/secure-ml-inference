@@ -18,7 +18,7 @@ from app.encoding import decode_score, encode_bias, encode_vector, encode_weight
 from app.model import extract_linear_params, load_model
 from app.server import Server
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
 
 logger = logging.getLogger(__name__)

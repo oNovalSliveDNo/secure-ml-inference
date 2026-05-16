@@ -17,7 +17,7 @@ from app.metrics import measure_payload_size
 from app.model import extract_linear_params, load_model
 from app.server import Server
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
 
 logger = logging.getLogger(__name__)

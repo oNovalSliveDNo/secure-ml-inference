@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 import phe as paillier
 import pytest
@@ -37,6 +38,23 @@ def test_model_info(client: TestClient) -> None:
     assert isinstance(data["classes"], list)
 
 
+def _build_valid_encrypted_payload(client: TestClient) -> dict[str, Any]:
+    """Build a valid encrypted inference payload for API tests."""
+    info_resp = client.get("/model/info")
+    assert info_resp.status_code == 200
+    feature_count = int(info_resp.json()["feature_count"])
+
+    public_key, _private_key = paillier.generate_paillier_keypair(n_length=512)
+    encrypted_features = [serialize_ciphertext(public_key.encrypt(0)) for _ in range(feature_count)]
+
+    return {
+        "public_key_n": str(public_key.n),
+        "encrypted_features": encrypted_features,
+        "scale": SCALE,
+        "feature_count": feature_count,
+    }
+
+
 def test_encrypted_inference(client: TestClient) -> None:
     info_resp = client.get("/model/info")
     assert info_resp.status_code == 200
@@ -59,3 +77,45 @@ def test_encrypted_inference(client: TestClient) -> None:
     assert "encrypted_score" in data
     assert "server_compute_ms" in data
     assert data["feature_count"] == feature_count
+
+
+def test_infer_encrypted_wrong_feature_count(client: TestClient) -> None:
+    payload = _build_valid_encrypted_payload(client)
+    payload["feature_count"] = int(payload["feature_count"]) - 1
+
+    resp = client.post("/infer/encrypted", json=payload)
+    assert resp.status_code == 400
+
+
+def test_infer_encrypted_invalid_scale(client: TestClient) -> None:
+    payload = _build_valid_encrypted_payload(client)
+    payload["scale"] = 999
+
+    resp = client.post("/infer/encrypted", json=payload)
+    assert resp.status_code == 400
+
+
+def test_infer_encrypted_broken_ciphertext(client: TestClient) -> None:
+    payload = _build_valid_encrypted_payload(client)
+    encrypted_features = list(payload["encrypted_features"])
+    encrypted_features[0] = "not_a_number"
+    payload["encrypted_features"] = encrypted_features
+
+    resp = client.post("/infer/encrypted", json=payload)
+    assert resp.status_code == 400
+
+
+def test_infer_encrypted_mismatched_feature_count_too_small(client: TestClient) -> None:
+    payload = _build_valid_encrypted_payload(client)
+    payload["feature_count"] = int(payload["feature_count"]) - 1
+
+    resp = client.post("/infer/encrypted", json=payload)
+    assert resp.status_code == 400
+
+
+def test_infer_encrypted_mismatched_feature_count_too_large(client: TestClient) -> None:
+    payload = _build_valid_encrypted_payload(client)
+    payload["feature_count"] = int(payload["feature_count"]) + 1
+
+    resp = client.post("/infer/encrypted", json=payload)
+    assert resp.status_code == 400
