@@ -73,7 +73,7 @@ ignore = [
     "N806",     # Переменные в функции должны быть в стиле lowercase
     "RUF001",   # Строка содержит неоднозначную `с` (КИРИЛЛИЧЕСКАЯ СТРОЧНАЯ БУКВА ES). Вы имели в виду `c` (ЛАТИНСКАЯ СТРОЧНАЯ БУКВА C)?
     "RUF002",   # Docstring contains ambiguous `с` (CYRILLIC SMALL LETTER ES). Did you mean `c` (LATIN SMALL LETTER C)?
-    "RUF003"    # Comment contains ambiguous `В` (CYRILLIC CAPITAL LETTER VE). Did you mean `B` (LATIN CAPITAL LETTER B)?
+    "RUF003",   # Comment contains ambiguous `В` (CYRILLIC CAPITAL LETTER VE). Did you mean `B` (LATIN CAPITAL LETTER B)?
 ]
 exclude = [
     "venv",
@@ -82,6 +82,9 @@ exclude = [
     "results",
     "notebooks",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"experiments/*.py" = ["N999"]  # Invalid module name: '...'
 
 [tool.ruff.lint.isort]
 known-first-party = ["app", "api", "ui", "experiments"]

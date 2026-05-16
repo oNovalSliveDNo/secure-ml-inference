@@ -113,6 +113,13 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     """Render step-by-step interactive protocol demo."""
     st.header("Демонстрация протокола")
 
+    # Модель загружается исключительно для демонстрационного сравнения.
+    # В защищённом протоколе клиент не использует веса модели.
+    st.info(
+        "Модель на клиенте загружена только для сравнения результатов. "
+        "В реальном протоколе веса модели находятся на сервере."
+    )
+
     x_test = resources["x_test"]
     y_test = resources["y_test"]
     model = resources["model"]
