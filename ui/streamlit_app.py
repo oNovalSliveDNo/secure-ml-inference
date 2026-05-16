@@ -19,6 +19,7 @@ from app.config import KEY_LENGTH, RANDOM_STATE, SCALE, TEST_SIZE, THRESHOLD
 from app.crypto import decrypt_score, deserialize_ciphertext, serialize_ciphertext
 from app.data import load_dataset, split_dataset
 from app.encoding import decode_score, encode_bias, encode_weights, encoded_plaintext_score
+from app.metrics import measure_payload_size
 from app.model import extract_linear_params, load_model
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
@@ -188,9 +189,10 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
         z_encoded = encoded_plaintext_score(x=x_scaled, w=w, b=b, scale=SCALE)
         prob_encoded = float(1.0 / (1.0 + np.exp(-z_encoded)))
         pred_encoded = int(prob_encoded >= THRESHOLD)
-        payload_bytes = len(str(request_payload).encode("utf-8"))
-        plaintext_bytes = len(sample.to_numpy(dtype=float).tobytes())
-        overhead_ratio = payload_bytes / max(plaintext_bytes, 1)
+        encrypted_bytes = measure_payload_size(request_payload)
+        plaintext_payload = sample.to_numpy(dtype=float).tolist()
+        plaintext_bytes = measure_payload_size(plaintext_payload)
+        overhead_ratio = encrypted_bytes / max(plaintext_bytes, 1)
 
         st.session_state.demo_result = {
             "sample_idx": sample_idx,
@@ -211,6 +213,8 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             "status_code": status_code,
             "server_compute_ms": _extract_server_compute_ms(response_payload),
             "request_payload": request_payload,
+            "encrypted_bytes": encrypted_bytes,
+            "plaintext_bytes": plaintext_bytes,
             "http_elapsed_ms": (request_ended - request_started) * 1000.0,
             "preprocess_ms": (t1 - t0) * 1000.0,
             "encrypt_ms": (t2 - t1) * 1000.0,
@@ -220,11 +224,13 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
 
     result = st.session_state.demo_result
 
-    k1, k2, k3 = st.columns(3)
+    k1, k2, k3, k4, k5 = st.columns(5)
     if result is None:
         k1.metric("Server sees plaintext", "NO")
         k2.metric("Prediction matches baseline", "—")
         k3.metric("Payload overhead", "—")
+        k4.metric("Encrypted payload", "—")
+        k5.metric("Plaintext payload", "—")
         st.info("Для расчёта KPI выполните шаг 2 и запустите защищённый инференс.")
         return
 
@@ -232,6 +238,8 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     k1.metric("Server sees plaintext", "NO")
     k2.metric("Prediction matches baseline", match_label)
     k3.metric("Payload overhead", f"{result['overhead_ratio']:.2f}x")
+    k4.metric("Encrypted payload", f"{result['encrypted_bytes']} B")
+    k5.metric("Plaintext payload", f"{result['plaintext_bytes']} B")
 
     st.subheader("Шаг 2. Выполнение защищённого инференса")
 
