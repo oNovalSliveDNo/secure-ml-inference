@@ -1,6 +1,10 @@
 @echo off
 set PYTHONPATH=%CD%;%PYTHONPATH%
 
+echo === Experiment 0: Save environment info ===
+python experiments/00_environment_info.py
+if %errorlevel% neq 0 exit /b %errorlevel%
+
 echo === Experiment 1: Learning the baseline model ===
 python experiments/01_train_baseline.py
 if %errorlevel% neq 0 exit /b %errorlevel%

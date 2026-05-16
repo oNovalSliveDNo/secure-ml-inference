@@ -10,6 +10,7 @@ run_step() {
   python "$script"
 }
 
+run_step "Experiment 0: Save environment info" "experiments/00_environment_info.py"
 run_step "Experiment 1: Learning the baseline model" "experiments/01_train_baseline.py"
 run_step "Experiment 2: Checking manual plaintext" "experiments/02_validate_manual_inference.py"
 run_step "Experiment 3: Encoded plaintext inference" "experiments/03_run_encoded_inference.py"

@@ -1,0 +1,13 @@
+{
+  "cpu": "13th Gen Intel(R) Core(TM) i5-1340P (1.90 GHz) - Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+  "ram": "40,0 GB",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python_version": "3.13.5 (tags/v3.13.5:6cb20a2, Jun 11 2025, 16:15:46) [MSC v.1943 64 bit (AMD64)]",
+  "key_library": {
+    "name": "phe",
+    "version": "1.5.0"
+  },
+  "scale": 10000,
+  "key_length": 1024,
+  "benchmark_runs": 30
+}
