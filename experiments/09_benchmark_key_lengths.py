@@ -30,6 +30,7 @@ CSV_HEADERS = [
     "key_length",
     "keygen_ms_mean",
     "encryption_ms_mean",
+    "server_init_ms_mean",
     "server_ms_mean",
     "decryption_ms_mean",
     "total_with_keygen_ms_mean",
@@ -76,6 +77,7 @@ def main() -> None:
     for key_length in KEY_LENGTHS:
         keygen_ms_values: list[float] = []
         encryption_ms_values: list[float] = []
+        server_init_ms_values: list[float] = []
         server_ms_values: list[float] = []
         decryption_ms_values: list[float] = []
         total_with_keygen_ms_values: list[float] = []
@@ -90,7 +92,10 @@ def main() -> None:
             t1 = time.perf_counter()
             keygen_ms_values.append((t1 - t0) * 1000.0)
 
+            t_init_start = time.perf_counter()
             server = Server(w_int=w_int, b_int=b_int, public_key=public_key)
+            t_init_end = time.perf_counter()
+            server_init_ms_values.append((t_init_end - t_init_start) * 1000.0)
 
             t0 = time.perf_counter()
             encrypted_vector = encrypt_vector(public_key=public_key, x_int=encoded_sample)
@@ -117,12 +122,16 @@ def main() -> None:
             t_total_end = time.perf_counter()
             total_with_keygen_ms_values.append((t_total_end - t_total_start) * 1000.0)
             total_without_keygen_ms_values.append(
-                encryption_ms_values[-1] + server_ms_values[-1] + decryption_ms_values[-1]
+                encryption_ms_values[-1]
+                + server_init_ms_values[-1]
+                + server_ms_values[-1]
+                + decryption_ms_values[-1]
             )
 
         logger.info("Key length %d bits benchmarked.", key_length)
         logger.info("  keygen mean/std/median: %s", _summarize(keygen_ms_values))
         logger.info("  encryption mean/std/median: %s", _summarize(encryption_ms_values))
+        logger.info("  server_init mean/std/median: %s", _summarize(server_init_ms_values))
         logger.info("  server mean/std/median: %s", _summarize(server_ms_values))
         logger.info("  decryption mean/std/median: %s", _summarize(decryption_ms_values))
 
@@ -131,6 +140,7 @@ def main() -> None:
                 "key_length": key_length,
                 "keygen_ms_mean": _mean(keygen_ms_values),
                 "encryption_ms_mean": _mean(encryption_ms_values),
+                "server_init_ms_mean": _mean(server_init_ms_values),
                 "server_ms_mean": _mean(server_ms_values),
                 "decryption_ms_mean": _mean(decryption_ms_values),
                 "total_with_keygen_ms_mean": _mean(total_with_keygen_ms_values),
