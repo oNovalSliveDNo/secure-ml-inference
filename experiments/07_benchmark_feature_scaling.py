@@ -16,9 +16,9 @@ from app.config import FEATURE_COUNTS, KEY_LENGTH, N_BENCHMARK_RUNS, RANDOM_STAT
 from app.crypto import decrypt_score, encrypt_vector, generate_keys, serialize_ciphertext
 from app.data import load_dataset, split_dataset
 from app.encoding import decode_score, encode_bias, encode_weights
+from app.linear_scorer import Server
 from app.metrics import measure_payload_size
 from app.model import extract_linear_params, load_model
-from app.server import Server
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 

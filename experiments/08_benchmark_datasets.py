@@ -19,8 +19,8 @@ from app.client import Client
 from app.config import KEY_LENGTH, RANDOM_STATE, SCALE, TEST_SIZE
 from app.encoding import encode_bias, encode_weights
 from app.inference import encoded_plaintext_inference, phe_inference_batch, plaintext_inference
+from app.linear_scorer import Server
 from app.model import extract_linear_params, train_baseline_model
-from app.server import Server
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

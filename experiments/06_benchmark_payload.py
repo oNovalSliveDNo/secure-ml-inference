@@ -13,9 +13,9 @@ from app.config import KEY_LENGTH, SCALE
 from app.crypto import serialize_ciphertext
 from app.data import load_dataset
 from app.encoding import encode_bias, encode_weights
+from app.linear_scorer import Server
 from app.metrics import measure_payload_size
 from app.model import extract_linear_params, load_model
-from app.server import Server
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 

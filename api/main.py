@@ -13,9 +13,9 @@ from sklearn.datasets import load_breast_cancer
 from app.config import SCALE
 from app.crypto import deserialize_ciphertext, serialize_ciphertext
 from app.encoding import encode_bias, encode_weights
+from app.linear_scorer import Server
 from app.model import extract_linear_params, load_model
 from app.schemas import EncryptedInferRequest, EncryptedInferResponse
-from app.server import Server
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

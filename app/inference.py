@@ -8,8 +8,8 @@ import numpy as np
 from app.client import Client
 from app.config import THRESHOLD
 from app.encoding import encoded_plaintext_score
+from app.linear_scorer import Server
 from app.model import compute_manual_score, sigmoid
-from app.server import Server
 
 
 def plaintext_inference(

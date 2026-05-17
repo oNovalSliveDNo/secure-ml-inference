@@ -7,7 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from app.client import Client
 from app.encoding import encode_bias, encode_weights
 from app.inference import phe_inference_one
-from app.server import Server
+from app.linear_scorer import Server
 
 
 def test_client_server_single_sample_matches_manual_encoded_path() -> None:

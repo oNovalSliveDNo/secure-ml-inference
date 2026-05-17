@@ -16,8 +16,8 @@ from app.config import N_BENCHMARK_RUNS, RANDOM_STATE, SCALE, TEST_SIZE
 from app.crypto import decrypt_score, encrypt_vector, generate_keys
 from app.data import load_dataset, split_dataset
 from app.encoding import encode_bias, encode_vector, encode_weights
+from app.linear_scorer import Server
 from app.model import extract_linear_params, load_model
-from app.server import Server
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
