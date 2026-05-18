@@ -20,7 +20,7 @@ def _setup_figure(title: str, size: tuple[float, float] = (12, 7)):
     return fig, ax
 
 
-def _box(ax, x: float, y: float, w: float, h: float, text: str, color: str):
+def _box(ax, x: float, y: float, w: float, h: float, text: str, color: str, fontsize: int = 11):
     patch = FancyBboxPatch(
         (x, y),
         w,
@@ -31,7 +31,7 @@ def _box(ax, x: float, y: float, w: float, h: float, text: str, color: str):
         facecolor=color,
     )
     ax.add_patch(patch)
-    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=11, wrap=True)
+    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=fontsize, wrap=True)
 
 
 def _arrow(ax, start: tuple[float, float], end: tuple[float, float], text: str = ""):
@@ -56,7 +56,16 @@ def generate_protocol_flow(path: Path) -> None:
         "Клиент\n1) Масштабирование\n2) Кодирование\n3) Шифрование",
         "#d8f3dc",
     )
-    _box(ax, 0.38, 0.62, 0.25, 0.22, "API\nЗапрос:\npublic_key_n,\nencrypted_features", "#fff3bf")
+    _box(
+        ax,
+        0.38,
+        0.62,
+        0.25,
+        0.22,
+        "API\nЗапрос:\npublic_key_n,\nencrypted_features\nscenario_id: classification / regression",
+        "#fff3bf",
+        fontsize=9,
+    )
     _box(ax, 0.70, 0.62, 0.25, 0.22, "Сервер\nГомоморфный\nлинейный score", "#d0ebff")
 
     _box(ax, 0.70, 0.24, 0.25, 0.22, "Ответ:\nencrypted_score", "#fff3bf")
@@ -98,7 +107,16 @@ def generate_threat_model(path: Path) -> None:
         "#d8f3dc",
     )
     _box(ax, 0.37, 0.58, 0.26, 0.26, "Канал связи\nнаблюдаем\nвнешним нарушителем", "#ffe3e3")
-    _box(ax, 0.69, 0.58, 0.26, 0.26, "Сервер (HBC)\nкорректен, но\nлюбопытен", "#d0ebff")
+    _box(
+        ax,
+        0.69,
+        0.58,
+        0.26,
+        0.26,
+        "Сервер (honest-but-curious)\nкорректен, но\nлюбопытен",
+        "#d0ebff",
+        fontsize=10,
+    )
 
     _box(ax, 0.20, 0.20, 0.22, 0.20, "Передаётся:\nшифртексты\nи открытый ключ", "#fff3bf")
     _box(ax, 0.58, 0.20, 0.22, 0.20, "Не передаётся:\nзакрытый ключ\nи plaintext", "#ffd6a5")
@@ -110,7 +128,7 @@ def generate_threat_model(path: Path) -> None:
     ax.text(
         0.5,
         0.07,
-        "HBC = honest-but-curious: сервер следует протоколу, но пытается извлечь метаданные.",
+        "Сервер следует протоколу, но может пытаться извлечь метаданные.",
         ha="center",
         fontsize=10,
     )
@@ -134,14 +152,23 @@ def generate_math_flow(path: Path) -> None:
         "Enc(z_int)=Σ Enc(x_i)^w_i · Enc(b)\n(гомоморфная линейная часть)",
         "#d0ebff",
     )
-    _box(ax, 0.33, 0.08, 0.22, 0.18, "z = Dec(Enc(z_int))/SCALE", "#fff3bf")
-    _box(ax, 0.05, 0.08, 0.22, 0.18, "ŷ = sigmoid(z)\nили регрессия", "#fff3bf")
+    _box(ax, 0.42, 0.08, 0.22, 0.18, "z = Dec(Enc(z_int))/SCALE", "#fff3bf")
+    _box(
+        ax,
+        0.02,
+        0.08,
+        0.30,
+        0.18,
+        "classification: p = sigmoid(z), ŷ = threshold(p)\nregression: ŷ = z, без sigmoid",
+        "#fff3bf",
+        fontsize=8,
+    )
 
     _arrow(ax, (0.27, 0.73), (0.33, 0.73))
     _arrow(ax, (0.55, 0.73), (0.61, 0.73))
     _arrow(ax, (0.76, 0.64), (0.76, 0.52), "на сервер")
-    _arrow(ax, (0.61, 0.43), (0.55, 0.17), "Enc(z)")
-    _arrow(ax, (0.33, 0.17), (0.27, 0.17))
+    _arrow(ax, (0.61, 0.43), (0.53, 0.17), "Enc(z)")
+    _arrow(ax, (0.42, 0.17), (0.32, 0.17))
 
     fig.tight_layout()
     fig.savefig(path, bbox_inches="tight")
