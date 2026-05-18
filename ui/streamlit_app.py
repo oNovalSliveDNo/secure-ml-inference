@@ -542,6 +542,28 @@ def show_architecture() -> None:
         """
     )
 
+    st.subheader("Схемы для презентации протокола")
+    required_schemes = [
+        "protocol_flow.png",
+        "threat_model.png",
+        "math_flow.png",
+        "plaintext_vs_encoded_vs_phe.png",
+    ]
+    missing_schemes = [name for name in required_schemes if not (SCHEMES_DIR / name).exists()]
+    if missing_schemes:
+        st.warning(
+            "Не найдены схемы: "
+            + ", ".join(missing_schemes)
+            + ". Запустите `python experiments/generate_schemes.py`."
+        )
+    else:
+        st.success("Все схемы найдены и готовы для встраивания.")
+
+    for scheme_name in required_schemes:
+        scheme_path = SCHEMES_DIR / scheme_name
+        if scheme_path.exists():
+            st.image(str(scheme_path), caption=scheme_name, width="stretch")
+
 
 def main() -> None:
     """Run the Streamlit application."""
