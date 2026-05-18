@@ -1,6 +1,6 @@
 # Протокол экспериментальной оценки
 
-В документе описываются цели, методика, сценарии и критерии успешности **одиннадцати экспериментов**, проводимых в рамках проекта `secure-ml-inference`.
+В документе описываются цели, методика, сценарии и критерии успешности **тринадцати экспериментов**, проводимых в рамках проекта `secure-ml-inference`.
 
 ## Цели экспериментов
 
@@ -253,3 +253,42 @@
 - Максимальная абсолютная ошибка score не превышает допустимого порога, обусловленного только квантованием (для тех экспериментов, где метрика считается).
 - Получены количественные оценки роста времени и размера, которые можно обсудить в выводе.
 - Все скрипты выполняются без ошибок и воспроизводят результаты при повторном запуске.
+
+## Эксперимент 12: Train regression baseline
+
+Скрипт `experiments/12_train_regression_baseline.py`.
+
+**Цель:** обучить baseline для regression-сценария и сохранить regression-артефакты.
+
+**Артефакты модели:**
+- `results/models/regression_model.pkl`
+- `results/models/regression_scaler.pkl`
+- `results/models/regression_weights.json`
+- `results/models/regression_metadata.json`
+
+**Таблица метрик:**
+- `results/tables/regression_quality_metrics.csv` (строка `Regression baseline`).
+
+## Эксперимент 13: Run PHE regression
+
+Скрипт `experiments/13_run_phe_regression.py`.
+
+**Цель:** оценить качество encoded и PHE-инференса в regression-сценарии относительно baseline.
+
+**Сценарий API/UI:**
+- `scenario_id = "regression"` в запросе `/infer/encrypted`;
+- в UI выбирается тот же сценарий в wizard-потоке.
+
+**Метрики:**
+- MAE, MSE, RMSE, R2, `mean_abs_error_vs_baseline`.
+
+**Артефакт:**
+- обновление `results/tables/regression_quality_metrics.csv` строками `Regression encoded` и `Regression PHE`.
+
+## Синхронизация формулировок API/UI
+
+Во всех сценариях и скриптах используются одинаковые идентификаторы:
+- `scenario_id="classification"`;
+- `scenario_id="regression"`.
+
+В UI это отражено как выбор сценария в wizard-потоке перед запуском защищённого инференса; в API — как обязательная маршрутизация к соответствующим весам и смещению в обработчике `/infer/encrypted`.

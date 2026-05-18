@@ -115,6 +115,8 @@ python experiments/08_benchmark_datasets.py
 python experiments/09_benchmark_key_lengths.py
 python experiments/10_benchmark_scale.py
 python experiments/11_benchmark_api_roundtrip.py
+python experiments/12_train_regression_baseline.py
+python experiments/13_run_phe_regression.py
 ```
 
 Примечание для эксперимента 11: требуется предварительно запущенный сервер FastAPI. Эксперимент может занять несколько минут в зависимости от CPU и длины ключа. Поле `server_compute_ms` отражает только время гомоморфного вычисления на сервере, а полная задержка (включая сериализацию, передачу и клиентские этапы) измеряется в этом же эксперименте и сохраняется в `results/tables/api_roundtrip_metrics.csv`.
@@ -137,6 +139,44 @@ python -m experiments.01_train_baseline
   ```bash
   ./run_experiments.sh
   ```
+
+### Запуск двух сценариев (classification / regression)
+
+Система поддерживает два `scenario_id`, синхронизированных между API и UI:
+
+- `classification` — бинарная классификация Breast Cancer (артефакты: `results/models/model.pkl`, `results/models/scaler.pkl`, `results/models/weights.json`, `results/models/metadata.json`).
+- `regression` — регрессия Diabetes (артефакты: `results/models/regression_model.pkl`, `results/models/regression_scaler.pkl`, `results/models/regression_weights.json`, `results/models/regression_metadata.json`).
+
+Запуск regression-сценария:
+
+```bash
+python experiments/12_train_regression_baseline.py
+python experiments/13_run_phe_regression.py
+```
+
+Проверка итоговых метрик regression-сценария:
+
+```bash
+cat results/tables/regression_quality_metrics.csv
+```
+
+### Обновлённый pipeline экспериментов (01–13)
+
+1. `01_train_baseline.py`
+2. `02_validate_manual_inference.py`
+3. `03_run_encoded_inference.py`
+4. `04_run_phe_inference.py`
+5. `05_benchmark_latency.py`
+6. `06_benchmark_payload.py`
+7. `07_benchmark_feature_scaling.py`
+8. `08_benchmark_datasets.py`
+9. `09_benchmark_key_lengths.py`
+10. `10_benchmark_scale.py`
+11. `11_benchmark_api_roundtrip.py`
+12. `12_train_regression_baseline.py`
+13. `13_run_phe_regression.py`
+
+Для полного запуска используйте `run_experiments.sh` / `run_experiments.bat`; они включают шаги 01–13 и настраивают `PYTHONPATH`.
 
 ### Unit-тесты и инструменты разработки
 
