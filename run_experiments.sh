@@ -29,8 +29,14 @@ run_step "Experiment 10: Benchmark by scale" "experiments/10_benchmark_scale.py"
 # experiment 11 requires a running FastAPI server; run manually after starting uvicorn
 # run_step "Experiment 11: API roundtrip benchmark" "experiments/11_benchmark_api_roundtrip.py"
 
+run_step "Experiment 12: Train regression baseline" "experiments/12_train_regression_baseline.py"
+run_step "Experiment 13: PHE regression" "experiments/13_run_phe_regression.py"
+
 echo "All experiments have been successfully completed."
 echo "To run API roundtrip benchmark (experiment 11), first start the API:"
 echo "  uvicorn api.main:app --host 0.0.0.0 --port 8000"
 echo "Then run:"
 echo "  python experiments/11_benchmark_api_roundtrip.py"
+echo "Regression experiments:"
+echo "  12) python experiments/12_train_regression_baseline.py"
+echo "  13) python experiments/13_run_phe_regression.py"

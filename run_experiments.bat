@@ -54,8 +54,19 @@ REM echo === Experiment 11: API roundtrip benchmark ===
 REM python experiments/11_benchmark_api_roundtrip.py
 REM if %errorlevel% neq 0 exit /b %errorlevel%
 
+echo === Experiment 12: Train regression baseline ===
+python experiments/12_train_regression_baseline.py
+if %errorlevel% neq 0 exit /b %errorlevel%
+
+echo === Experiment 13: PHE regression ===
+python experiments/13_run_phe_regression.py
+if %errorlevel% neq 0 exit /b %errorlevel%
+
 echo All experiments have been successfully completed.
 echo To run API roundtrip benchmark (experiment 11), first start the API:
 echo   uvicorn api.main:app --host 0.0.0.0 --port 8000
 echo Then run:
 echo   python experiments/11_benchmark_api_roundtrip.py
+echo Regression experiments:
+echo   12) python experiments/12_train_regression_baseline.py
+echo   13) python experiments/13_run_phe_regression.py
