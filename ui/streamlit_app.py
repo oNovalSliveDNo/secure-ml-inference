@@ -177,116 +177,231 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     with step1_note:
         st.warning("Эти данные не отправляются на сервер.")
 
-    st.session_state.setdefault(
-        "demo_state", {"scenario_id": scenario_id, "step": 0, "result": None}
-    )
+    st.session_state.setdefault("demo_state", {"scenario_id": scenario_id, "step": 1, "result": {}})
     if st.session_state.demo_state["scenario_id"] != scenario_id:
-        st.session_state.demo_state = {"scenario_id": scenario_id, "step": 0, "result": None}
+        st.session_state.demo_state = {"scenario_id": scenario_id, "step": 1,
+                                       "result": {}}
+        if st.session_state.demo_state.get("sample_idx") != sample_idx:
+            st.session_state.demo_state = {"scenario_id": scenario_id, "step": 1,
+                                           "result": {}, "sample_idx": sample_idx}
 
-    if st.button("Запустить защищённый инференс", type="primary"):
-        client = Client(scaler=scenario["scaler"], scale=SCALE, key_length=KEY_LENGTH)
+    wizard_state: dict[str, Any] = st.session_state.demo_state
+    result: dict[str, Any] = wizard_state["result"]
+    current_step = wizard_state["step"]
 
-        t0 = time.perf_counter()
-        x_scaled = client.preprocess(sample.to_numpy(dtype=float).reshape(1, -1))
-        step_scaling_ms = (time.perf_counter() - t0) * 1000.0
-        x_int = client.encode(x_scaled)
-        t1 = time.perf_counter()
+    if st.button("Начать заново"):
+        st.session_state.demo_state = {"scenario_id": scenario_id, "step": 1,
+                                       "result": {}, "sample_idx": sample_idx}
+        st.rerun()
 
-        enc_x = client.encrypt(x_int)
-        t2 = time.perf_counter()
+    for idx, title in enumerate(
+            [
+                "Шаг 1. Масштабирование",
+                "Шаг 2. Кодирование",
+                "Шаг 3. Генерация ключей и шифрование",
+                "Шаг 4. Отправка на сервер",
+                "Шаг 5. Расшифровка",
+                "Шаг 6. Постобработка и сравнение",
+                "Шаг 7. Итоговая сводка",
+            ],
+            start=1,
+    ):
+        marker = "🟢" if current_step == idx else ("✅" if current_step > idx else "⚪")
+        st.markdown(f"**{marker} {title}**")
 
-        request_payload: dict[str, Any] = {
-            "public_key_n": str(client.public_key.n),
-            "encrypted_features": [serialize_ciphertext(value) for value in enc_x],
-            "scale": SCALE,
-            "scenario_id": scenario_id,
-            "feature_count": len(enc_x),
-        }
+    if current_step >= 1:
+        with st.expander("Шаг 1. Масштабирование", expanded=current_step == 1):
+            if "x_scaled" in result:
+                pass
+            elif st.button("Масштабировать признаки", type="primary"):
+                client = Client(scaler=scenario["scaler"], scale=SCALE,
+                                key_length=KEY_LENGTH)
+                t0 = time.perf_counter()
+                x_scaled = client.preprocess(sample.to_numpy(dtype=float).reshape(1, -1))
+                result.update({"client": client, "x_scaled": x_scaled.flatten(),
+                               "scaling_ms": (time.perf_counter() - t0) * 1000.0})
+                wizard_state["step"] = 2
+                st.rerun()
+            if "x_scaled" in result:
+                st.dataframe(pd.DataFrame({"Признак": sample.index, "Raw": sample.values,
+                                           "Scaled": result["x_scaled"]}),
+                             width="stretch")
 
-        request_started = time.perf_counter()
-        try:
-            response = requests.post(
-                f"{API_URL}/infer/encrypted",
-                json=request_payload,
-                timeout=30,
-            )
-            status_code = response.status_code
-            response.raise_for_status()
-        except requests.RequestException as exc:
-            st.error(f"Ошибка при обращении к API ({API_URL}): {exc}")
-            return
-        request_ended = time.perf_counter()
+    if current_step >= 2:
+        with st.expander("Шаг 2. Кодирование", expanded=current_step == 2):
+            if "x_int" not in result and st.button("Закодировать в целые числа",
+                                                   type="primary"):
+                client = result["client"]
+                x_scaled = np.array(result["x_scaled"]).reshape(1, -1)
+                result["x_int"] = client.encode(x_scaled)
+                wizard_state["step"] = 3
+                st.rerun()
+            if "x_int" in result:
+                st.dataframe(pd.DataFrame(
+                    {"Scaled": result["x_scaled"], "Encoded (int)": result["x_int"]}),
+                             width="stretch")
 
-        response_payload = response.json()
-        encrypted_score_str = response_payload.get("encrypted_score")
-        if not isinstance(encrypted_score_str, str):
-            st.error("Некорректный ответ API: отсутствует поле encrypted_score.")
-            return
+    if current_step >= 3:
+        with st.expander("Шаг 3. Генерация ключей и шифрование",
+                         expanded=current_step == 3):
+            if "enc_x" not in result and st.button("Сгенерировать ключи и зашифровать",
+                                                   type="primary"):
+                client = result["client"]
+                t1 = time.perf_counter()
+                result["enc_x"] = client.encrypt(result["x_int"])
+                result["encrypt_ms"] = (time.perf_counter() - t1) * 1000.0
+                wizard_state["step"] = 4
+                st.rerun()
+            if "enc_x" in result:
+                client = result["client"]
+                st.code(f"public_key_n: {str(client.public_key.n)[:48]}...")
+                st.dataframe(pd.DataFrame({"Encoded": result["x_int"], "Encrypted": [
+                    serialize_ciphertext(v)[:36] + "..." for v in result["enc_x"]],
+                                           "Размер (байт)": [
+                                               len(serialize_ciphertext(v).encode(
+                                                   'utf-8')) for v in result["enc_x"]]}),
+                             width="stretch")
 
-        enc_score = deserialize_ciphertext(client.public_key, encrypted_score_str)
-        t3 = time.perf_counter()
+    if current_step >= 4:
+        with st.expander("Шаг 4. Отправка на сервер", expanded=current_step == 4):
+            if "encrypted_score" not in result and st.button(
+                    "Отправить зашифрованный запрос", type="primary"):
+                client = result["client"]
+                payload = {"public_key_n": str(client.public_key.n),
+                           "encrypted_features": [serialize_ciphertext(v) for v in
+                                                  result["enc_x"]], "scale": SCALE,
+                           "scenario_id": scenario_id,
+                           "feature_count": len(result["enc_x"])}
+                t_http0 = time.perf_counter()
+                try:
+                    response = requests.post(f"{API_URL}/infer/encrypted", json=payload,
+                                             timeout=30)
+                    response.raise_for_status()
+                except requests.RequestException as exc:
+                    st.error(f"Ошибка при обращении к API ({API_URL}): {exc}")
+                    return
+                http_elapsed_ms = (time.perf_counter() - t_http0) * 1000.0
+                response_payload = response.json()
+                encrypted_score_str = response_payload.get("encrypted_score")
+                if not isinstance(encrypted_score_str, str):
+                    st.error("Некорректный ответ API: отсутствует поле encrypted_score.")
+                    return
+                result.update(
+                    {"request_payload": payload, "status_code": response.status_code,
+                     "server_compute_ms": _extract_server_compute_ms(response_payload),
+                     "http_elapsed_ms": http_elapsed_ms,
+                     "encrypted_score": encrypted_score_str})
+                wizard_state["step"] = 5
+                st.rerun()
+            if "request_payload" in result:
+                st.json({"public_key_n": result["request_payload"]["public_key_n"][
+                                         :32] + "...",
+                         "encrypted_features": [c[:32] + "..." for c in
+                                                result["request_payload"][
+                                                    "encrypted_features"][:3]],
+                         "scale": result["request_payload"]["scale"],
+                         "feature_count": result["request_payload"]["feature_count"]})
+                st.write(
+                    f"HTTP-статус: {result['status_code']}, server_compute_ms: {result['server_compute_ms']}")
 
-        score_int = decrypt_score(client.private_key, enc_score)  # step 5
-        z_secure = decode_score(score_int=score_int, scale=SCALE)
+    if current_step >= 5:
+        with st.expander("Шаг 5. Расшифровка", expanded=current_step == 5):
+            if "z_secure" not in result and st.button("Расшифровать результат",
+                                                      type="primary"):
+                client = result["client"]
+                t_dec0 = time.perf_counter()
+                enc_score = deserialize_ciphertext(client.public_key,
+                                                   result["encrypted_score"])
+                score_int = decrypt_score(client.private_key, enc_score)
+                result.update({"score_int": score_int,
+                               "z_secure": decode_score(score_int=score_int, scale=SCALE),
+                               "decrypt_ms": (time.perf_counter() - t_dec0) * 1000.0})
+                wizard_state["step"] = 6
+                st.rerun()
+            if "z_secure" in result:
+                st.dataframe(pd.DataFrame([{"Этап": "Encrypted score",
+                                            "Значение": result["encrypted_score"][
+                                                        :80] + "..."},
+                                           {"Этап": "score_int",
+                                            "Значение": result["score_int"]},
+                                           {"Этап": "z",
+                                            "Значение": f"{result['z_secure']:.6f}"}]),
+                             width="stretch")
 
-        if scenario_id == "classification":
-            prob_secure = float(1.0 / (1.0 + np.exp(-z_secure)))
-            pred_secure = int(prob_secure >= THRESHOLD)
-        else:
-            prob_secure = None
-            pred_secure = None
-        t4 = time.perf_counter()
+    if current_step >= 6:
+        with st.expander("Шаг 6. Постобработка и сравнение", expanded=current_step == 6):
+            if "comparison_df" not in result and st.button("Получить прогноз и сравнить",
+                                                           type="primary"):
+                x_raw = sample.to_numpy(dtype=float).reshape(1, -1)
+                x_scaled = np.array(result["x_scaled"]).reshape(1, -1)
+                w, b = scenario["w"], scenario["b"]
+                z_encoded = float(
+                    encoded_plaintext_score(x=x_scaled, w=w, b=b, scale=SCALE))
+                baseline_pred = model.predict(x_raw)
+                baseline_value = float(baseline_pred[0])
+                result["true_label"] = float(y_test.iloc[sample_idx])
+                result["baseline_value"] = baseline_value
+                result["z_encoded"] = z_encoded
+                if scenario_id == "classification":
+                    z_baseline = float(model.decision_function(x_raw)[0]) if hasattr(
+                        model, "decision_function") else baseline_value
+                    prob_baseline = float(model.predict_proba(x_raw)[:, 1][0])
+                    pred_baseline = int(prob_baseline >= THRESHOLD)
+                    prob_encoded = float(1.0 / (1.0 + np.exp(-z_encoded)))
+                    pred_encoded = int(prob_encoded >= THRESHOLD)
+                    prob_secure = float(1.0 / (1.0 + np.exp(-result["z_secure"])))
+                    pred_secure = int(prob_secure >= THRESHOLD)
+                    result.update(
+                        {"pred_baseline": pred_baseline, "pred_encoded": pred_encoded,
+                         "pred_secure": pred_secure, "prob_baseline": prob_baseline,
+                         "prob_encoded": prob_encoded, "prob_secure": prob_secure})
+                    result["comparison_df"] = pd.DataFrame([{"Метод": "Baseline",
+                                                             "Linear score": z_baseline,
+                                                             "Probability": prob_baseline,
+                                                             "Class": pred_baseline},
+                                                            {"Метод": "Encoded plaintext",
+                                                             "Linear score": z_encoded,
+                                                             "Probability": prob_encoded,
+                                                             "Class": pred_encoded},
+                                                            {"Метод": "PHE inference",
+                                                             "Linear score": result[
+                                                                 "z_secure"],
+                                                             "Probability": prob_secure,
+                                                             "Class": pred_secure},
+                                                            {"Метод": "Истинная метка",
+                                                             "Linear score": None,
+                                                             "Probability": None,
+                                                             "Class": int(y_test.iloc[
+                                                                              sample_idx])}])
+                else:
+                    pred_baseline = baseline_value
+                    pred_encoded = z_encoded
+                    pred_secure = result["z_secure"]
+                    result.update(
+                        {"pred_baseline": pred_baseline, "pred_encoded": pred_encoded,
+                         "pred_secure": pred_secure})
+                    result["comparison_df"] = pd.DataFrame(
+                        [{"Метод": "Baseline", "Predicted value": pred_baseline},
+                         {"Метод": "Encoded plaintext", "Predicted value": pred_encoded},
+                         {"Метод": "PHE inference", "Predicted value": pred_secure},
+                         {"Метод": "Истинное значение",
+                          "Predicted value": float(y_test.iloc[sample_idx])}])
+                payload = result["request_payload"]
+                result["encrypted_bytes"] = measure_payload_size(payload)
+                result["plaintext_bytes"] = measure_payload_size(
+                    sample.to_numpy(dtype=float).tolist())
+                result["overhead_ratio"] = result["encrypted_bytes"] / max(
+                    result["plaintext_bytes"], 1)
+                wizard_state["step"] = 7
+                st.rerun()
+            if "comparison_df" in result:
+                st.dataframe(result["comparison_df"], width="stretch")
 
-        baseline_value = float(model.predict(sample.to_numpy(dtype=float).reshape(1, -1))[0])
-        w, b = scenario["w"], scenario["b"]
-        z_encoded = encoded_plaintext_score(x=x_scaled, w=w, b=b, scale=SCALE)
-        encoded_value = float(z_encoded)
-        encrypted_bytes = measure_payload_size(request_payload)
-        plaintext_payload = sample.to_numpy(dtype=float).tolist()
-        plaintext_bytes = measure_payload_size(plaintext_payload)
-        overhead_ratio = encrypted_bytes / max(plaintext_bytes, 1)
-
-        st.session_state.demo_state = {
-            "scenario_id": scenario_id,
-            "step": 7,
-            "result": {
-                "sample_idx": sample_idx,
-                "x_scaled": x_scaled.flatten(),
-                "x_int": x_int,
-                "enc_x": enc_x,
-                "encrypted_score": encrypted_score_str,
-                "score_int": score_int,
-                "z_secure": z_secure,
-                "prob_secure": prob_secure,
-                "pred_secure": pred_secure,
-                "z_encoded": z_encoded,
-                "encoded_value": encoded_value,
-                "baseline_value": baseline_value,
-                "pred_baseline": int(baseline_value) if scenario_id == "classification" else None,
-                "prob_baseline": (
-                    float(model.predict_proba(sample.to_numpy(dtype=float).reshape(1, -1))[:, 1][0])
-                    if scenario_id == "classification"
-                    else None
-                ),
-                "true_label": int(y_test.iloc[sample_idx]),
-                "status_code": status_code,
-                "server_compute_ms": _extract_server_compute_ms(response_payload),
-                "request_payload": request_payload,
-                "encrypted_bytes": encrypted_bytes,
-                "plaintext_bytes": plaintext_bytes,
-                "http_elapsed_ms": (request_ended - request_started) * 1000.0,
-                "preprocess_ms": (t1 - t0) * 1000.0,
-                "scaling_ms": step_scaling_ms,
-                "encrypt_ms": (t2 - t1) * 1000.0,
-                "decrypt_ms": (t4 - t3) * 1000.0,
-                "overhead_ratio": overhead_ratio,
-            },
-        }
-
-    result = st.session_state.demo_state.get("result")
+    if current_step >= 7 and "comparison_df" in result:
+        st.subheader("Шаг 7. Итоговая сводка")
 
     k1, k2, k3, k4, k5 = st.columns(5)
-    if result is None:
+    if not result:
         k1.metric("Server sees plaintext", "NO")
         k2.metric("Prediction matches baseline", "—")
         k3.metric("Payload overhead", "—")
@@ -295,172 +410,22 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
         st.info("Для расчёта KPI выполните шаг 2 и запустите защищённый инференс.")
         return
 
-    match_label = (
-        "YES"
-        if scenario_id == "classification" and result["pred_secure"] == result["pred_baseline"]
-        else "—"
-    )
+    match_label = "ДА" if scenario_id == "classification" and result.get("pred_secure") == result.get("pred_baseline") else "НЕТ"
     k1.metric("Server sees plaintext", "NO")
     k2.metric("Prediction matches baseline", match_label)
     k3.metric("Payload overhead", f"{result['overhead_ratio']:.2f}x")
     k4.metric("Encrypted payload", f"{result['encrypted_bytes']} B")
     k5.metric("Plaintext payload", f"{result['plaintext_bytes']} B")
 
-    st.subheader("Шаги 0–7 защищённого протокола")
-
-    preview_count = 5
-    preproc_df = pd.DataFrame(
-        {
-            "Признак": sample.index,
-            "Масштабированное значение": result["x_scaled"],
-            "Закодированное значение": result["x_int"],
-        }
-    )
-    st.markdown("**Шаг 1–2: масштабирование и кодирование**")
-    st.dataframe(preproc_df.head(preview_count), width="stretch")
-    if st.checkbox("Показать все признаки после предобработки", value=False):
-        st.dataframe(preproc_df, width="stretch")
-
-    encrypted_df = pd.DataFrame(
-        {
-            "Признак": sample.index,
-            "Зашифрованное значение": [
-                serialize_ciphertext(v)[:40] + "..." for v in result["enc_x"]
-            ],
-            "Размер (байт)": [
-                len(serialize_ciphertext(v).encode("utf-8")) for v in result["enc_x"]
-            ],
-        }
-    )
-    st.markdown("**Шаг 3: шифрование признаков**")
-    st.dataframe(encrypted_df, width="stretch")
-
-    http_df = pd.DataFrame(
-        [
-            {
-                "URL": f"{API_URL}/infer/encrypted",
-                "HTTP-статус": result["status_code"],
-                "Время ответа HTTP (мс)": f"{result['http_elapsed_ms']:.2f}",
-                "Время серверного вычисления (мс)": (
-                    f"{result['server_compute_ms']:.2f}"
-                    if result["server_compute_ms"] is not None
-                    else "не передано сервером"
-                ),
-            }
-        ]
-    )
-    st.markdown("**Шаг 4: API request**")
-    request_payload = result["request_payload"]
-    request_preview = {
-        "public_key_n": f"{str(request_payload['public_key_n'])[:32]}...",
-        "encrypted_features": [
-            f"{cipher[:32]}..." for cipher in request_payload["encrypted_features"][:3]
-        ]
-        + (["..."] if len(request_payload["encrypted_features"]) > 3 else []),
-        "scale": request_payload["scale"],
-        "feature_count": request_payload["feature_count"],
-    }
-    st.json(request_preview)
-
-    st.info("Что НЕ отправляется: исходные признаки, закрытый ключ, расшифрованный score.")
-
-    st.markdown("**Ответ сервера**")
-    st.json(
-        {
-            "encrypted_score": f"{result['encrypted_score'][:48]}...",
-            "server_compute_ms": (
-                round(result["server_compute_ms"], 3)
-                if result["server_compute_ms"] is not None
-                else None
-            ),
-        }
-    )
-
-    st.markdown("**HTTP-запрос и ответ сервера**")
-    st.dataframe(http_df, width="stretch")
-
-    st.markdown("**Что видит сервер**")
-    left, right = st.columns(2)
-    with left:
-        st.caption("Доступно")
-        st.markdown(
-            "- Открытый ключ\n- Зашифрованные признаки\n- Закодированные параметры модели\n- Параметр масштаба"
-        )
-    with right:
-        st.caption("Недоступно")
-        st.markdown(
-            "- Исходные признаки\n- Закрытый ключ\n- Расшифрованный score\n- Вероятность и класс"
-        )
-
-    st.markdown("**Шаг 5–6: дешифрование и постобработка**")
-    decrypt_rows = [
-        {
-            "Этап": "Зашифрованный score (шифртекст)",
-            "Значение": f"{result['encrypted_score'][:80]}...",
-        },
-        {"Этап": "Расшифрованный score_int", "Значение": str(result["score_int"])},
-        {"Этап": "Декодированный z", "Значение": f"{result['z_secure']:.6f}"},
-    ]
-    if scenario_id == "classification":
-        decrypt_rows.extend(
-            [
-                {"Этап": "Вероятность sigmoid(z)", "Значение": f"{result['prob_secure']:.6f}"},
-                {
-                    "Этап": "Предсказание",
-                    "Значение": f"{label_names[result['pred_secure']]} (class={result['pred_secure']})",
-                },
-            ]
-        )
-    else:
-        decrypt_rows.append({"Этап": "Числовой прогноз", "Значение": f"{result['z_secure']:.6f}"})
-    decrypt_steps_df = pd.DataFrame(decrypt_rows)
-    st.dataframe(decrypt_steps_df, width="stretch")
-    if scenario_id == "classification":
-        st.caption(
-            "Вероятность sigmoid(z) — это вероятность класса 1 (benign / доброкачественная)."
-        )
-
-    st.subheader("Шаг 7. Summary")
-    if scenario_id == "classification":
-        comparison_df = pd.DataFrame(
-            [
-                {
-                    "Метод": "Baseline",
-                    "Вероятность": result["prob_baseline"],
-                    "Предсказание": f"{label_names[result['pred_baseline']]} (class={result['pred_baseline']})",
-                },
-                {
-                    "Метод": "PHE inference",
-                    "Вероятность": result["prob_secure"],
-                    "Предсказание": f"{label_names[result['pred_secure']]} (class={result['pred_secure']})",
-                },
-                {
-                    "Метод": "Истинная метка",
-                    "Вероятность": None,
-                    "Предсказание": label_names[result["true_label"]]
-                    + f" (class={result['true_label']})",
-                },
-            ]
-        )
-        comparison_df["Вероятность"] = comparison_df["Вероятность"].map(
-            lambda v: f"{float(v):.6f}" if v is not None else "N/A"
-        )
-        comparison_df["Совпадение Baseline/PHE"] = (
-            "Да" if result["pred_baseline"] == result["pred_secure"] else "Нет"
-        )
-    else:
-        comparison_df = pd.DataFrame(
-            [
-                {"Метод": "Baseline", "Прогноз": result["baseline_value"]},
-                {"Метод": "Encoded plaintext", "Прогноз": result["encoded_value"]},
-                {"Метод": "PHE inference", "Прогноз": result["z_secure"]},
-            ]
-        )
-        comparison_df["Δ к Baseline"] = comparison_df["Прогноз"].map(
-            lambda v: f"{(float(v) - result['baseline_value']):.6f}"
-        )
-
-    st.dataframe(comparison_df, width="stretch")
+    if scenario_id == "regression":
+        delta_phe_baseline = abs(
+            float(result["pred_secure"]) - float(result["pred_baseline"]))
+        delta_phe_encoded = abs(
+            float(result["pred_secure"]) - float(result["pred_encoded"]))
+        r1, r2, r3 = st.columns(3)
+        r1.metric("Разность PHE и Baseline", f"{delta_phe_baseline:.6f}")
+        r2.metric("Разность PHE и Encoded", f"{delta_phe_encoded:.6f}")
+        r3.metric("Близость к baseline", "ДА" if delta_phe_baseline < 0.01 else "НЕТ")
 
     scheme_files = sorted(SCHEMES_DIR.glob("*.png"))
     if scheme_files:
