@@ -2,14 +2,14 @@
 
 **Конфиденциальный ML-инференс табличной модели с частично гомоморфным шифрованием**
 
-Прототип демонстрирует возможность выполнения предсказания линейной модели (логистическая регрессия) без раскрытия входных признаков клиента серверной стороне. Сервер получает только зашифрованные данные и возвращает зашифрованный линейный score, а клиент локально выполняет расшифрование и пороговую функцию.
+Прототип демонстрирует защищённый ML-инференс линейных моделей на основе частично гомоморфного шифрования Paillier. Реализованы два сценария: бинарная классификация (LogisticRegression на Breast Cancer) и регрессия (Ridge на Diabetes). Сервер выполняет только зашифрованное линейное вычисление, клиент расшифровывает и выполняет постобработку.
 
 Проект разработан в рамках выпускной квалификационной работы по теме конфиденциального машинного обучения. Основное внимание уделяется этапу online-инференса заранее обученной модели.
 
 ## Краткий обзор
 
-- **Датасет**: Breast Cancer Wisconsin Diagnostic (`sklearn.datasets.load_breast_cancer`)
-- **Модель**: StandardScaler + LogisticRegression (бинарная классификация)
+- **classification**: `sklearn.datasets.load_breast_cancer`, `StandardScaler + LogisticRegression`
+- **regression**: `sklearn.datasets.load_diabetes`, `StandardScaler + Ridge`
 - **Шифрование**: Частично гомоморфное шифрование Paillier (`python-paillier`)
 - **Протокол**: Клиент шифрует стандартизованные и кодированные в целые числа признаки; сервер вычисляет зашифрованный линейный score; клиент расшифровывает и применяет сигмоиду.
 - **Реализация**: Core-логика на Python, серверное API на FastAPI, клиентское демо на Streamlit, все компоненты контейнеризованы через Docker.
@@ -45,14 +45,19 @@
 
 ## Структура проекта
 
-Основные модули:
+Основные модули и артефакты:
 
 - `app/` – ядро бизнес-логики (ML, кодирование, шифрование, инференс, метрики)
+- `app/linear_scorer.py` – общий линейный scorer для classification/regression-сценариев
+- `app/schemas.py` – схемы сценариев и метаданных моделей
 - `api/` – серверное FastAPI-приложение
 - `ui/` – клиентское Streamlit-приложение
 - `experiments/` – скрипты для проведения и регистрации экспериментов
 - `results/` – сгенерированные артефакты (модели, таблицы, графики)
+- `results/tables/regression_quality_metrics.csv` – метрики качества regression-сценария
+- `results/tables/api_roundtrip_metrics.csv` – метрики полного API roundtrip
 - `docs/` – архитектурная документация, модель угроз, протокол экспериментов
+- `docs/schemes/` – схемы и иллюстрации для документации
 
 Детализированная иерархия описана в файле `STRUCTURE.md`.
 
@@ -103,6 +108,8 @@ python experiments/01_train_baseline.py
 
 Рекомендуемый способ запуска — пакетные скрипты `run_experiments.sh` / `run_experiments.bat`: они уже выставляют `PYTHONPATH` автоматически.
 
+Classification (Breast Cancer + LogisticRegression):
+
 ```bash
 python experiments/01_train_baseline.py
 python experiments/02_validate_manual_inference.py
@@ -115,6 +122,11 @@ python experiments/08_benchmark_datasets.py
 python experiments/09_benchmark_key_lengths.py
 python experiments/10_benchmark_scale.py
 python experiments/11_benchmark_api_roundtrip.py
+```
+
+Regression (Diabetes + Ridge):
+
+```bash
 python experiments/12_train_regression_baseline.py
 python experiments/13_run_phe_regression.py
 ```
