@@ -259,6 +259,7 @@
 Скрипт `experiments/12_train_regression_baseline.py`.
 
 **Цель:** обучить baseline для regression-сценария и сохранить regression-артефакты.
+`Plaintext baseline` в этом сценарии — прямой прогноз Ridge после стандартизации признаков.
 
 **Артефакты модели:**
 - `results/models/regression_model.pkl`
@@ -267,13 +268,14 @@
 - `results/models/regression_metadata.json`
 
 **Таблица метрик:**
-- `results/tables/regression_quality_metrics.csv` (строка `Regression baseline`).
+- `results/tables/regression_quality_metrics.csv` (строка `Plaintext baseline`).
 
 ## Эксперимент 13: Run PHE regression
 
 Скрипт `experiments/13_run_phe_regression.py`.
 
-**Цель:** оценить качество encoded и PHE-инференса в regression-сценарии относительно baseline.
+**Цель:** оценить качество `Encoded plaintext` и `PHE inference` в regression-сценарии относительно `Plaintext baseline`.
+Для regression `Encoded plaintext` означает тот же линейный score через fixed-point кодирование без Paillier, а `PHE inference` — зашифрованное линейное вычисление Paillier; после расшифрования линейный выход сразу является прогнозом без sigmoid.
 
 **Сценарий API/UI:**
 - `scenario_id = "regression"` в запросе `/infer/encrypted`;
@@ -283,7 +285,7 @@
 - MAE, MSE, RMSE, R2, `mean_abs_error_vs_baseline`.
 
 **Артефакт:**
-- обновление `results/tables/regression_quality_metrics.csv` строками `Regression encoded` и `Regression PHE`.
+- обновление `results/tables/regression_quality_metrics.csv` строками `Encoded plaintext` и `PHE inference`.
 
 ## Синхронизация формулировок API/UI
 
