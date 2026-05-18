@@ -1,4 +1,3 @@
-# experiments/13_run_phe_regression.py
 """Experiment 13: Evaluate encoded and PHE regression inference quality."""
 
 from __future__ import annotations
@@ -114,8 +113,8 @@ def main() -> None:
     client = Client(scaler=scaler, scale=SCALE, key_length=KEY_LENGTH)
     server = EncryptedLinearScorer(w_int=w_int, b_int=b_int, public_key=client.public_key)
 
-    for sample_raw in np.asarray(x_test, dtype=np.float64):
-        x_raw_2d = sample_raw.reshape(1, -1)
+    for i in range(len(x_test)):
+        x_raw_2d = x_test.iloc[[i]]  # DataFrame с одной строкой
         x_scaled_one = client.preprocess(x_raw_2d)
         x_int = client.encode(x_scaled_one)
 

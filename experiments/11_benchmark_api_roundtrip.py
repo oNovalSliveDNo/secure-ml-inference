@@ -1,4 +1,3 @@
-# experiments/11_benchmark_api_roundtrip.py
 """Experiment 11: Benchmark end-to-end API latency via real HTTP requests."""
 
 from __future__ import annotations
@@ -69,7 +68,7 @@ def main() -> None:
         random_state=RANDOM_STATE,
     )
 
-    sample = x_test.to_numpy()[0]
+    sample = x_test.iloc[[0]]  # DataFrame с одной строкой и колонками
     scaler = model.named_steps["scaler"]
 
     metrics: dict[str, list[float]] = {header: [] for header in CSV_HEADERS}
@@ -80,7 +79,7 @@ def main() -> None:
         t_total_start = time.perf_counter()
 
         t0 = time.perf_counter()
-        x_scaled = client.preprocess(sample.reshape(1, -1))
+        x_scaled = client.preprocess(sample)  # DataFrame, warning исчезнет
         x_int = client.encode(x_scaled)
         enc_x = client.encrypt(x_int)
         payload = {

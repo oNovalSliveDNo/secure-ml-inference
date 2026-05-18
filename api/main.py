@@ -5,11 +5,11 @@ import logging
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import phe as paillier
 from fastapi import FastAPI, HTTPException
-from sklearn.datasets import load_breast_cancer
 
 from app.config import SCALE
 from app.crypto import deserialize_ciphertext, serialize_ciphertext
@@ -22,32 +22,51 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 MODEL_PATH = "results/models/model.pkl"
+REGRESSION_MODEL_PATH = "results/models/regression_model.pkl"
 DEFAULT_SCENARIO_ID = "classification"
 SUPPORTED_SCENARIO_IDS = ("classification", "regression")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Load model artifacts and initialize encrypted inference server state."""
-    pipeline = load_model(MODEL_PATH)
-    weights, bias = extract_linear_params(pipeline=pipeline)
+    """Load model artifacts for all supported scenarios."""
 
-    w_int = encode_weights(w=weights, scale=SCALE)
-    b_int = encode_bias(b=bias, scale=SCALE)
+    # --- Классификация ---
+    pipeline_cls = load_model(MODEL_PATH)
+    w_cls, b_cls = extract_linear_params(pipeline=pipeline_cls)
+    w_int_cls = encode_weights(w=w_cls, scale=SCALE)
+    b_int_cls = encode_bias(b=b_cls, scale=SCALE)
 
-    dataset = load_breast_cancer()
-    class_names = [str(label) for label in dataset.target_names]
+    class_names = ["malignant", "benign"]  # или из dataset
 
-    scenarios: dict[str, dict[str, Any]] = {}
-    for scenario_id in SUPPORTED_SCENARIO_IDS:
-        scenarios[scenario_id] = {
-            "w_int": w_int,
-            "b_int": b_int,
-            "feature_count": int(w_int.shape[0]),
+    scenarios: dict[str, dict[str, Any]] = {
+        "classification": {
+            "w_int": w_int_cls,
+            "b_int": b_int_cls,
+            "feature_count": int(w_int_cls.shape[0]),
         }
+    }
+
+    # --- Регрессия ---
+    if Path(REGRESSION_MODEL_PATH).exists():
+        pipeline_reg = load_model(REGRESSION_MODEL_PATH)
+        # Достаём Ridge-регрессор напрямую (в обход extract_linear_params)
+        ridge = pipeline_reg.named_steps["regressor"]
+        w_reg = ridge.coef_.ravel()
+        b_reg = float(ridge.intercept_)
+        w_int_reg = encode_weights(w=w_reg, scale=SCALE)
+        b_int_reg = encode_bias(b=b_reg, scale=SCALE)
+        scenarios["regression"] = {
+            "w_int": w_int_reg,
+            "b_int": b_int_reg,
+            "feature_count": int(w_int_reg.shape[0]),
+        }
+        logger.info("Regression model loaded with %d features", w_int_reg.shape[0])
+    else:
+        logger.warning("Regression model not found at %s", REGRESSION_MODEL_PATH)
 
     app.state.scenarios = scenarios
-    app.state.feature_count = int(scenarios[DEFAULT_SCENARIO_ID]["feature_count"])
+    app.state.feature_count = int(scenarios["classification"]["feature_count"])
     app.state.classes = class_names
 
     logger.info(
@@ -56,7 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.feature_count,
         class_names,
     )
-    yield  # точка разделения startup / shutdown (shutdown не требуется)
+    yield
 
 
 app = FastAPI(title="Secure ML Inference API", lifespan=lifespan)

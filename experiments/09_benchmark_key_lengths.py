@@ -1,4 +1,3 @@
-# experiments/09_benchmark_key_lengths.py
 """Experiment 09: Benchmark Paillier key lengths on one Breast Cancer sample."""
 
 from __future__ import annotations
@@ -69,8 +68,8 @@ def main() -> None:
     w_int = encode_weights(w=w, scale=SCALE)
     b_int = encode_bias(b=b, scale=SCALE)
 
-    sample = x_test.to_numpy()[0]
-    x_scaled = scaler.transform(sample.reshape(1, -1))[0]
+    sample = x_test.iloc[[0]]  # DataFrame
+    x_scaled = scaler.transform(sample)[0]
     encoded_sample = [int(v) for v in encode_vector(x=x_scaled, scale=SCALE).tolist()]
 
     TABLES_DIR.mkdir(parents=True, exist_ok=True)

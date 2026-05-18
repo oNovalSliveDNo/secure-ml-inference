@@ -1,0 +1,20 @@
+{
+  "dataset": "load_diabetes",
+  "feature_names": [
+    "age",
+    "sex",
+    "bmi",
+    "bp",
+    "s1",
+    "s2",
+    "s3",
+    "s4",
+    "s5",
+    "s6"
+  ],
+  "target_name": "target",
+  "test_size": 0.2,
+  "random_state": 42,
+  "model": "Ridge",
+  "alpha": 1.0
+}

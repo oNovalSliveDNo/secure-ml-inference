@@ -1,11 +1,9 @@
-# experiments/06_benchmark_payload.py
 """Experiment 06: Measure payload sizes of plaintext vs encrypted requests/responses."""
 
 from __future__ import annotations
 
 import csv
 import logging
-import warnings
 from pathlib import Path
 
 from app.client import Client
@@ -16,9 +14,6 @@ from app.encoding import encode_bias, encode_weights
 from app.linear_scorer import Server
 from app.metrics import measure_payload_size
 from app.model import extract_linear_params, load_model
-
-warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
-
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -35,7 +30,7 @@ def main() -> None:
 
     model = load_model(str(MODEL_PATH))
     features, _ = load_dataset()
-    sample_raw = features.iloc[0].to_numpy(dtype=float)
+    sample_raw = features.iloc[[0]]  # одна строка DataFrame с колонками
 
     scaler = model.named_steps["scaler"]
     w, b = extract_linear_params(model)
@@ -48,9 +43,9 @@ def main() -> None:
     )
 
     # Request payloads
-    plaintext_request = sample_raw.tolist()  # JSON-list of float values.
+    plaintext_request = sample_raw.iloc[0].tolist()  # JSON-list of float values.
 
-    x_scaled = client.preprocess(sample_raw.reshape(1, -1))
+    x_scaled = client.preprocess(sample_raw)  # DataFrame
     x_int = client.encode(x_scaled)
     enc_x = client.encrypt(x_int)
     encrypted_request = {
@@ -64,7 +59,7 @@ def main() -> None:
     encrypted_request_bytes = measure_payload_size(encrypted_request)
 
     # Response payloads
-    plaintext_prob = float(model.predict_proba(sample_raw.reshape(1, -1))[:, 1][0])
+    plaintext_prob = float(model.predict_proba(sample_raw)[:, 1][0])
     plaintext_response = {"score": plaintext_prob}
 
     encrypted_score = server.compute_encrypted_score(enc_x)

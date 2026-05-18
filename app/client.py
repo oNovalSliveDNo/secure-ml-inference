@@ -4,6 +4,7 @@
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import phe as paillier
 
 from app.config import THRESHOLD
@@ -37,17 +38,27 @@ class Client:
         self.key_length: int = int(key_length)
         self.public_key, self.private_key = generate_keys(n_length=self.key_length)
 
-    def preprocess(self, raw_x: np.ndarray) -> np.ndarray:
+    def preprocess(self, raw_x: Any) -> np.ndarray:
         """
         Scale one raw sample using the stored scaler.
 
+        Accepts a DataFrame (one row) or a numpy array.
+        If a numpy array is given, it is automatically wrapped into a DataFrame
+        using the feature names the scaler was fitted on, to suppress warnings.
+
         Args:
-            raw_x: Raw feature sample with shape (1, n_features).
+            raw_x: One sample (DataFrame or array with shape (1, n_features)).
 
         Returns:
             One-dimensional scaled feature vector.
         """
-        x_scaled: np.ndarray = self.scaler.transform(raw_x)
+        if isinstance(raw_x, np.ndarray):
+            # Восстанавливаем имена признаков, чтобы scaler не ругался
+            if hasattr(self.scaler, "feature_names_in_"):
+                raw_x = pd.DataFrame(raw_x, columns=self.scaler.feature_names_in_)
+            else:
+                raw_x = pd.DataFrame(raw_x)
+        x_scaled = self.scaler.transform(raw_x)
         return np.asarray(x_scaled[0], dtype=np.float64)
 
     def encode(self, x_scaled: np.ndarray) -> np.ndarray:

@@ -1,11 +1,9 @@
-# experiments/04_run_phe_inference.py
-"""Experiment 04: Run PHE inference on test set and measure quality."""
+# """Experiment 04: Run PHE inference on test set and measure quality."""
 
 from __future__ import annotations
 
 import csv
 import logging
-import warnings
 from pathlib import Path
 
 from app.client import Client
@@ -16,9 +14,6 @@ from app.inference import encoded_plaintext_inference, phe_inference_batch, plai
 from app.linear_scorer import Server
 from app.metrics import classification_metrics
 from app.model import extract_linear_params, load_model
-
-warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
-
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -78,7 +73,7 @@ def main() -> None:
     )
 
     # Full test split is used; if runtime becomes a bottleneck, switch to a deterministic subset.
-    phe_pred, phe_prob = phe_inference_batch(client=client, server=server, x_raw=x_test.to_numpy())
+    phe_pred, phe_prob = phe_inference_batch(client=client, server=server, x_raw=x_test)
 
     _, _ = plaintext_inference(model=model, x_test=x_test)
     x_scaled = scaler.transform(x_test)

@@ -1,4 +1,3 @@
-# experiments/10_benchmark_scale.py
 """Experiment 10: Benchmark impact of SCALE on fixed-point and PHE agreement."""
 
 from __future__ import annotations
@@ -45,11 +44,11 @@ def main() -> None:
         random_state=RANDOM_STATE,
     )
 
-    baseline_pred, _ = plaintext_inference(model=model, x_test=x_test.to_numpy())
+    baseline_pred, _ = plaintext_inference(model=model, x_test=x_test)
 
     scaler = model.named_steps["scaler"]
     w, b = extract_linear_params(model)
-    x_scaled = scaler.transform(x_test.to_numpy())
+    x_scaled = scaler.transform(x_test)  # DataFrame, предупреждений нет
 
     # Compare linear score before sigmoid to avoid numerical instability near 0/1 probabilities.
     manual_scores = compute_manual_score(x=x_scaled, w=w, b=b)
@@ -81,7 +80,7 @@ def main() -> None:
             public_key=client.public_key,
         )
 
-        x_subset = x_test.to_numpy()[:PHE_SUBSET_SIZE]
+        x_subset = x_test.iloc[:PHE_SUBSET_SIZE]  # DataFrame
         encoded_subset = encoded_pred[:PHE_SUBSET_SIZE]
         phe_pred, _ = phe_inference_batch(client=client, server=server, x_raw=x_subset)
         phe_match_rate = float(np.mean(phe_pred == encoded_subset))

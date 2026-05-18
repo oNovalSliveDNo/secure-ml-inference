@@ -34,6 +34,7 @@ def split_dataset(
     target: pd.Series,
     test_size: float,
     random_state: int,
+    use_stratify: bool = True,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     """
     Split dataset into train/test subsets with class stratification.
@@ -47,11 +48,12 @@ def split_dataset(
     Returns:
         A tuple `(X_train, X_test, y_train, y_test)`.
     """
+    stratify_arg = target if use_stratify else None
     X_train, X_test, y_train, y_test = train_test_split(
         features,
         target,
         test_size=test_size,
         random_state=random_state,
-        stratify=target,
+        stratify=stratify_arg,
     )
     return X_train, X_test, y_train, y_test

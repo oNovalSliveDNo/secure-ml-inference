@@ -1,4 +1,3 @@
-# experiments/05_benchmark_latency.py
 """Experiment 05: Benchmark latency components of PHE inference."""
 
 from __future__ import annotations
@@ -6,7 +5,6 @@ from __future__ import annotations
 import csv
 import logging
 import time
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -17,9 +15,6 @@ from app.data import load_dataset, split_dataset
 from app.encoding import decode_score, encode_bias, encode_vector, encode_weights
 from app.linear_scorer import Server
 from app.model import extract_linear_params, load_model
-
-warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
-
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -89,7 +84,7 @@ def main() -> None:
     w, b = extract_linear_params(model)
     w_int = encode_weights(w=w, scale=SCALE)
     b_int = encode_bias(b=b, scale=SCALE)
-    sample = x_test.to_numpy()[0]
+    sample = x_test.iloc[[0]]  # DataFrame с одной строкой
 
     measurements: dict[str, list[float]] = {stage: [] for stage in STAGES}
 
@@ -97,7 +92,8 @@ def main() -> None:
         t_total_start = time.perf_counter()
 
         t0 = time.perf_counter()
-        x_scaled = scaler.transform(sample.reshape(1, -1))[0]
+        # sample уже DataFrame, поэтому предупреждения не будет
+        x_scaled = scaler.transform(sample)[0]
         t1 = time.perf_counter()
         measurements["preprocessing"].append(_to_ms(t0, t1))
 

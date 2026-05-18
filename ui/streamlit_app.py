@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 import time
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -22,9 +21,6 @@ from app.data import load_dataset, split_dataset
 from app.encoding import decode_score, encoded_plaintext_score
 from app.metrics import measure_payload_size
 from app.model import extract_linear_params, load_model
-
-warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
-
 
 st.set_page_config(page_title="Защищённый ML-инференс — Демонстрация", layout="wide")
 
@@ -119,9 +115,10 @@ def load_resources() -> dict[str, Any]:
             target=reg_target,
             test_size=TEST_SIZE,
             random_state=RANDOM_STATE,
+            use_stratify=False,
         )
         scaler = reg_model.named_steps["scaler"]
-        ridge = reg_model.named_steps["ridge"]
+        ridge = reg_model.named_steps["regressor"]
         w_reg = ridge.coef_.ravel()
         b_reg = float(ridge.intercept_)
         scenarios["regression"] = {
@@ -439,13 +436,15 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                 },
                 {
                     "Метод": "Истинная метка",
-                    "Вероятность": "",
+                    "Вероятность": None,
                     "Предсказание": label_names[result["true_label"]]
                     + f" (class={result['true_label']})",
                 },
             ]
         )
-        comparison_df["Вероятность"] = comparison_df["Вероятность"].map(lambda v: f"{float(v):.6f}")
+        comparison_df["Вероятность"] = comparison_df["Вероятность"].map(
+            lambda v: f"{float(v):.6f}" if v is not None else "N/A"
+        )
         comparison_df["Совпадение Baseline/PHE"] = (
             "Да" if result["pred_baseline"] == result["pred_secure"] else "Нет"
         )

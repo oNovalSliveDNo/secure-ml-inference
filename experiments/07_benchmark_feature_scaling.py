@@ -1,4 +1,3 @@
-# experiments/07_benchmark_feature_scaling.py
 """Experiment 07: Benchmark impact of feature count on time and size."""
 
 from __future__ import annotations
@@ -6,7 +5,6 @@ from __future__ import annotations
 import csv
 import logging
 import time
-import warnings
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -19,9 +17,6 @@ from app.encoding import decode_score, encode_bias, encode_weights
 from app.linear_scorer import Server
 from app.metrics import measure_payload_size
 from app.model import extract_linear_params, load_model
-
-warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
-
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -52,8 +47,8 @@ def main() -> None:
     w, b = extract_linear_params(model)
     top_indices = np.argsort(np.abs(w))[::-1]
 
-    sample_raw = x_test.to_numpy()[0]
-    x_scaled_full = scaler.transform(sample_raw.reshape(1, -1))[0]
+    sample_raw = x_test.iloc[[0]]  # DataFrame с одной строкой
+    x_scaled_full = scaler.transform(sample_raw)[0]
 
     results: list[dict[str, float | int]] = []
 
