@@ -22,13 +22,13 @@ secure-ml-inference/
 ├── docker-compose.yml              # Service definitions: api (FastAPI) and ui (Streamlit) with network and volumes
 ├── requirements.txt                # Core Python dependencies for the whole project
 ├── README.md                       # Project overview, threats, architecture, run instructions, and limitations (written last)
-├── Makefile                        # (optional) Convenience commands: train, run-experiments, docker-up, clean
 │
 ├── app/                            # Core business logic (ML, cryptography, utilities)
 │   ├── __init__.py                 # Package initialisation
 │   ├── config.py                   # Configuration constants: RANDOM_STATE, TEST_SIZE, SCALE, KEY_LENGTH, THRESHOLD, FEATURE_COUNTS, etc.
 │   ├── data.py                     # Dataset loading (load_breast_cancer), train/test split, feature name extraction
 │   ├── model.py                    # Baseline model training (Pipeline: StandardScaler + LogisticRegression), model/scaler persistence, weight extraction (coef_, intercept_)
+│   ├── linear_scorer.py            # Universal linear scorer for classification/regression using extracted weights and bias
 │   ├── encoding.py                 # Fixed‑point encoding/decoding: encode_vector, encode_weights, encode_bias, decode_score
 │   ├── crypto.py                   # Paillier wrapper: key generation, vector encryption, score decryption, ciphertext serialisation/deserialisation, size estimation
 │   ├── client.py                   # Client class encapsulating client‑side logic: scaling, encoding, key generation, encryption, decryption, sigmoid/threshold
@@ -49,26 +49,46 @@ secure-ml-inference/
 │                                   #   - Architecture (interaction diagram)
 │
 ├── experiments/                    # Reproducible experiment scripts
-│   ├── 01_train_baseline.py        # Train model, save model.pkl, scaler.pkl, weights.json, metadata.json to results/models/
-│   ├── 02_validate_manual_inference.py  # Verify manual calculation matches predict_proba, output errors and statistics
-│   ├── 03_run_encoded_inference.py # Evaluate quality with fixed‑point encoding (no encryption), append row to quality_metrics.csv
-│   ├── 04_run_phe_inference.py     # Run PHE inference on test set (or subset), append results to quality_metrics.csv
-│   ├── 05_benchmark_latency.py     # Measure timing: preprocessing, encoding, key gen, encryption, server compute, decryption, total, write to latency_metrics.csv
+│   ├── 00_environment_info.py      # Capture Python, package, platform, CPU, and runtime environment details to environment.json
+│   ├── 01_train_baseline.py        # Train classification baseline, save model.pkl, scaler.pkl, weights.json, metadata.json to results/models/
+│   ├── 02_validate_manual_inference.py  # Verify manual classification inference matches predict_proba, output errors and statistics
+│   ├── 03_run_encoded_inference.py # Evaluate classification quality with fixed‑point encoding (no encryption), append row to quality_metrics.csv
+│   ├── 04_run_phe_inference.py     # Run PHE classification inference on test set (or subset), append results to quality_metrics.csv│   ├── 05_benchmark_latency.py     # Measure timing: preprocessing, encoding, key gen, encryption, server compute, decryption, total, write to latency_metrics.csv
 │   ├── 06_benchmark_payload.py     # Estimate plaintext/encrypted request/response sizes, expansion factors, write to payload_metrics.csv
-│   └── 07_benchmark_feature_scaling.py  # Measure time & size vs feature count (5,10,20,30), write to feature_scaling_metrics.csv and generate plots
+│   ├── 07_benchmark_feature_scaling.py  # Measure time & size vs feature count (5,10,20,30), write to feature_scaling_metrics.csv and generate plots
+│   ├── 08_benchmark_datasets.py    # Benchmark classification inference across datasets, write to dataset_benchmark_metrics.csv
+│   ├── 09_benchmark_key_lengths.py # Benchmark PHE key length impact, write to key_length_metrics.csv
+│   ├── 10_benchmark_scale.py       # Benchmark fixed‑point scale impact, write to scale_metrics.csv
+│   ├── 11_benchmark_api_roundtrip.py  # Benchmark end-to-end encrypted API round trips, write to api_roundtrip_metrics.csv
+│   ├── 12_train_regression_baseline.py  # Train regression baseline and save regression artifacts to results/models/
+│   └── 13_run_phe_regression.py    # Run encoded/PHE regression inference and write regression_quality_metrics.csv
 │
 ├── results/                        # Artifact storage (models, numeric results, plots)
 │   ├── models/                     # Serialised model, scaler, JSON weights, etc.
-│   ├── tables/                     # CSV metric files: quality_metrics.csv, latency_metrics.csv, payload_metrics.csv, feature_scaling_metrics.csv
+│   ├── tables/                     # CSV/JSON metric files
+│   │   ├── environment.json
+│   │   ├── quality_metrics.csv
+│   │   ├── regression_quality_metrics.csv
+│   │   ├── latency_metrics.csv
+│   │   ├── payload_metrics.csv
+│   │   ├── feature_scaling_metrics.csv
+│   │   ├── dataset_benchmark_metrics.csv
+│   │   ├── key_length_metrics.csv
+│   │   ├── scale_metrics.csv
+│   │   └── api_roundtrip_metrics.csv
 │   └── plots/                      # PNG plots: feature_count_vs_total_time.png, feature_count_vs_request_size.png, feature_count_vs_server_time.png
 │
 ├── docs/                           # Project documentation (for thesis/dissertation)
 │   ├── architecture.md             # Detailed architecture: components, data flows, roles, protocol steps
 │   ├── threat_model.md             # Threat model, trust assumptions, protection boundaries (honest‑but‑curious server)
-│   └── experiment_protocol.md      # Experiment methodology: parameters, metrics, success criteria, interpretation
+│   ├── experiment_protocol.md      # Experiment methodology: parameters, metrics, success criteria, interpretation
+│   └── schemes/                    # Generated protocol and architecture diagrams
+│       ├── protocol_flow.png
+│       ├── plaintext_vs_encoded_vs_phe.png
+│       ├── math_flow.png
+│       └── threat_model.png
 │
-└── notebooks/                      # Demo Jupyter notebook (optional)
-    └── demo.ipynb                  # Step‑by‑step walk‑through: from data loading to PHE inference with plots and explanations
+└── tests/                          # Pytest suite (22+ tests expected) covering encoding, crypto, inference, client/server, and API behavior
 ```
 
 ### Key Component Explanations
@@ -91,13 +111,11 @@ secure-ml-inference/
 
 - **`docs/`** – documentation required for the thesis text. These files describe the architecture, threat model, and experiment protocol. They can be directly transferred into the corresponding sections of the explanatory note.
 
-- **`notebooks/demo.ipynb`** – an educational/presentation notebook that may duplicate the Streamlit UI logic but in a linear format with markdown explanations, convenient for publishing on GitHub.
-
 ### Additional Best Practices
 
 1. **Single source of configuration** – all parameters (paths, seed, scale, etc.) are set in `app/config.py` and read from environment variables with sensible defaults. This allows easy overrides without changing code.
 2. **Type hints and docstrings** – mandatory for all functions/methods, aiding tools like GitHub Copilot and simplifying debugging.
 3. **Logging** – use the standard `logging` module instead of `print` throughout core logic and scripts.
-4. **Testing** – a `tests/` directory is optional but beneficial. At minimum, experiment scripts include assertions (e.g., comparing manual and sklearn predictions) to ensure correctness.
+4. **Testing** – the repository includes a `tests/` directory with an expected 22+ pytest tests covering core encoding, cryptography, inference, client/server, and API behavior. Experiment scripts also include assertions (e.g., comparing manual and sklearn predictions) to ensure correctness.
 5. **Dependency management** – `requirements.txt` pins library versions for reproducibility. Multi‑stage Docker builds reduce image size.
 6. **Error handling** – `api/main.py` includes exception handling with meaningful HTTP error codes (422 for invalid data, 500 for internal errors).
