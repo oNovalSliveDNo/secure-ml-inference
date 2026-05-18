@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import json
 import logging
 import os
@@ -31,9 +32,32 @@ def _get_cpu_model() -> str:
 
 
 def _get_ram_info() -> str:
-    """Return RAM size in GiB for Linux; otherwise manual placeholder."""
+    """Return RAM size in GiB, or ``unknown`` if it cannot be detected automatically."""
     if os.name == "nt":
-        return "fill manually"
+
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        memory_status = MEMORYSTATUSEX()
+        memory_status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(memory_status)):
+            total_gib = memory_status.ullTotalPhys / (1024**3)
+            return f"{total_gib:.2f} GiB"
+
+        logger.warning(
+            "Unable to detect RAM automatically; set it manually before publishing results."
+        )
+        return "unknown"
 
     if (
         hasattr(os, "sysconf")
@@ -46,7 +70,8 @@ def _get_ram_info() -> str:
         total_gib = total_bytes / (1024**3)
         return f"{total_gib:.2f} GiB"
 
-    return "fill manually"
+    logger.warning("Unable to detect RAM automatically; set it manually before publishing results.")
+    return "unknown"
 
 
 def _get_phe_version() -> str:
