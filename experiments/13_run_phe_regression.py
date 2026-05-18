@@ -31,11 +31,12 @@ CSV_HEADERS = [
     "mse",
     "rmse",
     "r2",
-    "diff_mae",
-    "diff_mse",
-    "diff_rmse",
-    "diff_r2",
-    "match_rate_tol_1e_2",
+    "mean_abs_diff_vs_plaintext",
+    "max_abs_diff_vs_plaintext",
+    "mean_abs_diff_vs_encoded",
+    "max_abs_diff_vs_encoded",
+    "match_rate_vs_plaintext_tol_1e_2",
+    "match_rate_vs_encoded_tol_1e_2",
 ]
 
 
@@ -62,22 +63,28 @@ def _append_quality_row(row: dict[str, float | str]) -> None:
 def _build_row(
     mode: str,
     metrics: dict[str, float],
-    ref_pred: np.ndarray,
+    baseline_pred: np.ndarray,
+    encoded_pred: np.ndarray,
     cur_pred: np.ndarray,
 ) -> dict[str, float | str]:
-    diff = np.asarray(cur_pred, dtype=np.float64) - np.asarray(ref_pred, dtype=np.float64)
-    diff_mse = float(np.mean(diff**2))
+    diff_vs_plaintext = np.asarray(cur_pred, dtype=np.float64) - np.asarray(
+        baseline_pred, dtype=np.float64
+    )
+    diff_vs_encoded = np.asarray(cur_pred, dtype=np.float64) - np.asarray(
+        encoded_pred, dtype=np.float64
+    )
     return {
         "mode": mode,
         "mae": metrics["mae"],
         "mse": metrics["mse"],
         "rmse": metrics["rmse"],
         "r2": metrics["r2"],
-        "diff_mae": float(np.mean(np.abs(diff))),
-        "diff_mse": diff_mse,
-        "diff_rmse": diff_mse**0.5,
-        "diff_r2": float(r2_score(ref_pred, cur_pred)),
-        "match_rate_tol_1e_2": float(np.mean(np.abs(diff) <= 1e-2)),
+        "mean_abs_diff_vs_plaintext": float(np.mean(np.abs(diff_vs_plaintext))),
+        "max_abs_diff_vs_plaintext": float(np.max(np.abs(diff_vs_plaintext))),
+        "mean_abs_diff_vs_encoded": float(np.mean(np.abs(diff_vs_encoded))),
+        "max_abs_diff_vs_encoded": float(np.max(np.abs(diff_vs_encoded))),
+        "match_rate_vs_plaintext_tol_1e_2": float(np.mean(np.abs(diff_vs_plaintext) <= 1e-2)),
+        "match_rate_vs_encoded_tol_1e_2": float(np.mean(np.abs(diff_vs_encoded) <= 1e-2)),
     }
 
 
@@ -136,9 +143,32 @@ def main() -> None:
     logger.info("PHE metrics: %s", phe_metrics)
 
     _append_quality_row(
-        _build_row("Encoded plaintext", encoded_metrics, y_pred_baseline, y_pred_encoded)
+        _build_row(
+            mode="Plaintext baseline",
+            metrics=_regression_metrics(y_true=y_true, y_pred=y_pred_baseline),
+            baseline_pred=y_pred_baseline,
+            encoded_pred=y_pred_baseline,
+            cur_pred=y_pred_baseline,
+        )
     )
-    _append_quality_row(_build_row("PHE inference", phe_metrics, y_pred_encoded, y_pred_phe))
+    _append_quality_row(
+        _build_row(
+            mode="Encoded plaintext",
+            metrics=encoded_metrics,
+            baseline_pred=y_pred_baseline,
+            encoded_pred=y_pred_encoded,
+            cur_pred=y_pred_encoded,
+        )
+    )
+    _append_quality_row(
+        _build_row(
+            mode="PHE inference",
+            metrics=phe_metrics,
+            baseline_pred=y_pred_baseline,
+            encoded_pred=y_pred_encoded,
+            cur_pred=y_pred_phe,
+        )
+    )
 
     logger.info("Saved regression quality rows to %s", QUALITY_CSV_PATH)
 

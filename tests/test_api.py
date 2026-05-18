@@ -49,6 +49,7 @@ def _build_valid_encrypted_payload(client: TestClient) -> dict[str, Any]:
 
     return {
         "public_key_n": str(public_key.n),
+        "scenario_id": "classification",
         "encrypted_features": encrypted_features,
         "scale": SCALE,
         "feature_count": feature_count,
@@ -116,6 +117,32 @@ def test_infer_encrypted_mismatched_feature_count_too_small(client: TestClient) 
 def test_infer_encrypted_mismatched_feature_count_too_large(client: TestClient) -> None:
     payload = _build_valid_encrypted_payload(client)
     payload["feature_count"] = int(payload["feature_count"]) + 1
+
+    resp = client.post("/infer/encrypted", json=payload)
+    assert resp.status_code == 400
+
+
+def test_encrypted_inference_regression_scenario(client: TestClient) -> None:
+    public_key, _private_key = paillier.generate_paillier_keypair(n_length=512)
+    feature_count = 10
+    encrypted_features = [serialize_ciphertext(public_key.encrypt(0)) for _ in range(feature_count)]
+    payload = {
+        "public_key_n": str(public_key.n),
+        "scenario_id": "regression",
+        "encrypted_features": encrypted_features,
+        "scale": SCALE,
+        "feature_count": feature_count,
+    }
+
+    resp = client.post("/infer/encrypted", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "encrypted_score" in data
+
+
+def test_unknown_scenario_id_returns_400(client: TestClient) -> None:
+    payload = _build_valid_encrypted_payload(client)
+    payload["scenario_id"] = "invalid"
 
     resp = client.post("/infer/encrypted", json=payload)
     assert resp.status_code == 400

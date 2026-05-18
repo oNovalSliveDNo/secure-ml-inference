@@ -20,10 +20,6 @@ MODEL_PATH = Path("results/models/model.pkl")
 SCORE_TOLERANCE = 1e-9
 
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
-
 def main() -> None:
     """
     Validate that manual plaintext inference exactly matches sklearn baseline.
@@ -59,8 +55,13 @@ def main() -> None:
     logger.info("match_rate=%.10f", match_rate)
     logger.info("max_score_diff=%.12e", max_score_diff)
 
-    if match_rate == 1.0 and max_score_diff < SCORE_TOLERANCE:
-        logger.info("Manual plaintext inference validation passed.")
+    if match_rate != 1.0 or max_score_diff >= SCORE_TOLERANCE:
+        raise AssertionError(
+            f"Manual inference validation failed: match_rate={match_rate}, "
+            f"max_score_diff={max_score_diff}"
+        )
+
+    logger.info("Manual plaintext inference validation passed.")
 
     logger.info("Validation complete.")
 

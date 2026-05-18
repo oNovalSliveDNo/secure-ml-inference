@@ -438,21 +438,21 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                         ]
                     )
                 else:
-                    pred_baseline = baseline_value
-                    pred_encoded = z_encoded
-                    pred_secure = result["z_secure"]
+                    pred_baseline_value = float(baseline_value)
+                    pred_encoded_value = float(z_encoded)
+                    pred_secure_value = float(result["z_secure"])
                     result.update(
                         {
-                            "pred_baseline": pred_baseline,
-                            "pred_encoded": pred_encoded,
-                            "pred_secure": pred_secure,
+                            "pred_baseline": pred_baseline_value,
+                            "pred_encoded": pred_encoded_value,
+                            "pred_secure": pred_secure_value,
                         }
                     )
                     result["comparison_df"] = pd.DataFrame(
                         [
-                            {"Метод": "Baseline", "Predicted value": pred_baseline},
-                            {"Метод": "Encoded plaintext", "Predicted value": pred_encoded},
-                            {"Метод": "PHE inference", "Predicted value": pred_secure},
+                            {"Метод": "Baseline", "Predicted value": pred_baseline_value},
+                            {"Метод": "Encoded plaintext", "Predicted value": pred_encoded_value},
+                            {"Метод": "PHE inference", "Predicted value": pred_secure_value},
                             {
                                 "Метод": "Истинное значение",
                                 "Predicted value": float(y_test.iloc[sample_idx]),
