@@ -162,7 +162,7 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     x_test = scenario["x_test"]
     y_test = scenario["y_test"]
     model = scenario["model"]
-    label_names = {0: "malignant (злокачественная)", 1: "benign (доброкачественная)"}
+    # label_names = {0: "malignant (злокачественная)", 1: "benign (доброкачественная)"}
 
     sample_idx = st.slider("Шаг 0. Выберите индекс тестового образца", 0, len(x_test) - 1, 0)
     sample = x_test.iloc[sample_idx]
@@ -249,8 +249,8 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
         with st.expander("Шаг 2. Кодирование", expanded=current_step == 2):
             if "x_int" not in result and st.button("Закодировать в целые числа", type="primary"):
                 client = result["client"]
-                x_scaled = np.array(result["x_scaled"]).reshape(1, -1)
-                result["x_int"] = client.encode(x_scaled)
+                # result["x_scaled"] уже одномерный, его и кодируем
+                result["x_int"] = client.encode(result["x_scaled"])
                 wizard_state["step"] = 3
                 st.rerun()
             if "x_int" in result:
@@ -379,7 +379,7 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                 "Получить прогноз и сравнить", type="primary"
             ):
                 x_raw = sample.to_numpy(dtype=float).reshape(1, -1)
-                x_scaled = np.array(result["x_scaled"]).reshape(1, -1)
+                x_scaled = np.array(result["x_scaled"])
                 w, b = scenario["w"], scenario["b"]
                 z_encoded = float(encoded_plaintext_score(x=x_scaled, w=w, b=b, scale=SCALE))
                 baseline_pred = model.predict(x_raw)
@@ -476,40 +476,38 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
         st.subheader("Шаг 7. Итоговая сводка")
 
     k1, k2, k3, k4, k5 = st.columns(5)
-    if not result:
+    if "overhead_ratio" in result:
+        match_label = (
+            "ДА"
+            if scenario_id == "classification"
+            and result.get("pred_secure") == result.get("pred_baseline")
+            else "НЕТ"
+        )
+        k1.metric("Server sees plaintext", "NO")
+        k2.metric("Prediction matches baseline", match_label)
+        k3.metric("Payload overhead", f"{result['overhead_ratio']:.2f}x")
+        k4.metric("Encrypted payload", f"{result['encrypted_bytes']} B")
+        k5.metric("Plaintext payload", f"{result['plaintext_bytes']} B")
+
+        if scenario_id == "regression":
+            delta_phe_baseline = abs(float(result["pred_secure"]) - float(result["pred_baseline"]))
+            delta_phe_encoded = abs(float(result["pred_secure"]) - float(result["pred_encoded"]))
+            r1, r2, r3 = st.columns(3)
+            r1.metric("Разность PHE и Baseline", f"{delta_phe_baseline:.6f}")
+            r2.metric("Разность PHE и Encoded", f"{delta_phe_encoded:.6f}")
+            r3.metric("Близость к baseline", "ДА" if delta_phe_baseline < 0.01 else "НЕТ")
+    else:
         k1.metric("Server sees plaintext", "NO")
         k2.metric("Prediction matches baseline", "—")
         k3.metric("Payload overhead", "—")
         k4.metric("Encrypted payload", "—")
         k5.metric("Plaintext payload", "—")
-        st.info("Для расчёта KPI выполните шаг 2 и запустите защищённый инференс.")
-        return
 
-    match_label = (
-        "ДА"
-        if scenario_id == "classification"
-        and result.get("pred_secure") == result.get("pred_baseline")
-        else "НЕТ"
-    )
-    k1.metric("Server sees plaintext", "NO")
-    k2.metric("Prediction matches baseline", match_label)
-    k3.metric("Payload overhead", f"{result['overhead_ratio']:.2f}x")
-    k4.metric("Encrypted payload", f"{result['encrypted_bytes']} B")
-    k5.metric("Plaintext payload", f"{result['plaintext_bytes']} B")
-
-    if scenario_id == "regression":
-        delta_phe_baseline = abs(float(result["pred_secure"]) - float(result["pred_baseline"]))
-        delta_phe_encoded = abs(float(result["pred_secure"]) - float(result["pred_encoded"]))
-        r1, r2, r3 = st.columns(3)
-        r1.metric("Разность PHE и Baseline", f"{delta_phe_baseline:.6f}")
-        r2.metric("Разность PHE и Encoded", f"{delta_phe_encoded:.6f}")
-        r3.metric("Близость к baseline", "ДА" if delta_phe_baseline < 0.01 else "НЕТ")
-
-    scheme_files = sorted(SCHEMES_DIR.glob("*.png"))
-    if scheme_files:
-        st.subheader("Схемы протокола")
-        for scheme in scheme_files:
-            st.image(str(scheme), caption=scheme.name, width="stretch")
+    # scheme_files = sorted(SCHEMES_DIR.glob("*.png"))
+    # if scheme_files:
+    #     st.subheader("Схемы протокола")
+    #     for scheme in scheme_files:
+    #         st.image(str(scheme), caption=scheme.name, width="stretch")
 
 
 def show_metrics_dashboard() -> None:
@@ -531,7 +529,11 @@ def show_metrics_dashboard() -> None:
         )
 
     for csv_file in csv_files:
-        df = pd.read_csv(csv_file)
+        try:
+            df = pd.read_csv(csv_file)
+        except Exception as exc:
+            st.warning(f"Не удалось прочитать {csv_file.name}: {exc}")
+            continue
         st.subheader(f"Таблица: {csv_file.name}")
         st.dataframe(df, width="stretch")
 
