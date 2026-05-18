@@ -8,6 +8,7 @@ class EncryptedInferRequest(BaseModel):
     """Request body for /infer/encrypted."""
 
     public_key_n: str
+    scenario_id: str = Field("classification")
     encrypted_features: list[str] = Field(min_length=1)
     scale: int = Field(gt=0)
     feature_count: int = Field(gt=0)
