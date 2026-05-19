@@ -485,13 +485,11 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
 
         if scenario_id == "classification":
             match_label = (
-                "ДА" if result.get("pred_secure") == result.get(
-                    "pred_baseline") else "НЕТ"
+                "ДА" if result.get("pred_secure") == result.get("pred_baseline") else "НЕТ"
             )
             k2.metric("Совпадение с baseline", match_label)
         else:
-            delta_phe_baseline = abs(
-                float(result["pred_secure"]) - float(result["pred_baseline"]))
+            delta_phe_baseline = abs(float(result["pred_secure"]) - float(result["pred_baseline"]))
             match_label = "ДА" if delta_phe_baseline < 0.01 else "НЕТ"
             k2.metric(
                 "Прогноз близок к baseline",
@@ -581,7 +579,9 @@ def show_architecture() -> None:
 ### Поток защищённого инференса
 1. **Клиент**: исходные признаки → стандартизация → кодирование с фиксированной точкой (`SCALE`) → шифрование Пайе.
 2. **Сервер**: получает только зашифрованные признаки и открытый ключ, вычисляет зашифрованный линейный score `Enc(z_int)`.
-3. **Клиент**: расшифровывает `z_int`, преобразует в вещественное `z`, применяет сигмоиду и пороговое правило.
+3. **Клиент**:
+   * Для классификации: вычисляет сигмоиду и пороговое правило.
+   * Для регрессии: расшифрованное значение является числовым прогнозом.
 
 ### Граница доверия
 - Сервер никогда не видит открытые признаки и не имеет доступа к закрытому ключу.
