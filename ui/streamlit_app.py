@@ -177,16 +177,20 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     with step1_note:
         st.warning("Эти данные не отправляются на сервер.")
 
-    st.session_state.setdefault("demo_state", {"scenario_id": scenario_id, "step": 1, "result": {}})
-    if st.session_state.demo_state["scenario_id"] != scenario_id:
-        st.session_state.demo_state = {"scenario_id": scenario_id, "step": 1, "result": {}}
-        if st.session_state.demo_state.get("sample_idx") != sample_idx:
-            st.session_state.demo_state = {
-                "scenario_id": scenario_id,
-                "step": 1,
-                "result": {},
-                "sample_idx": sample_idx,
-            }
+    st.session_state.setdefault(
+        "demo_state",
+        {"scenario_id": scenario_id, "sample_idx": sample_idx, "step": 1, "result": {}},
+    )
+    if (
+        st.session_state.demo_state["scenario_id"] != scenario_id
+        or st.session_state.demo_state.get("sample_idx") != sample_idx
+    ):
+        st.session_state.demo_state = {
+            "scenario_id": scenario_id,
+            "sample_idx": sample_idx,
+            "step": 1,
+            "result": {},
+        }
 
     wizard_state: dict[str, Any] = st.session_state.demo_state
     result: dict[str, Any] = wizard_state["result"]
