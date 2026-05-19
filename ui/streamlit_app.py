@@ -481,28 +481,36 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
 
     k1, k2, k3, k4, k5 = st.columns(5)
     if "overhead_ratio" in result:
-        match_label = (
-            "ДА"
-            if scenario_id == "classification"
-            and result.get("pred_secure") == result.get("pred_baseline")
-            else "НЕТ"
-        )
         k1.metric("Server sees plaintext", "NO")
-        k2.metric("Prediction matches baseline", match_label)
+
+        if scenario_id == "classification":
+            match_label = (
+                "ДА" if result.get("pred_secure") == result.get(
+                    "pred_baseline") else "НЕТ"
+            )
+            k2.metric("Совпадение с baseline", match_label)
+        else:
+            delta_phe_baseline = abs(
+                float(result["pred_secure"]) - float(result["pred_baseline"]))
+            match_label = "ДА" if delta_phe_baseline < 0.01 else "НЕТ"
+            k2.metric(
+                "Прогноз близок к baseline",
+                match_label,
+                delta=f"Δ = {delta_phe_baseline:.4f}",
+            )
+
         k3.metric("Payload overhead", f"{result['overhead_ratio']:.2f}x")
         k4.metric("Encrypted payload", f"{result['encrypted_bytes']} B")
         k5.metric("Plaintext payload", f"{result['plaintext_bytes']} B")
 
         if scenario_id == "regression":
-            delta_phe_baseline = abs(float(result["pred_secure"]) - float(result["pred_baseline"]))
             delta_phe_encoded = abs(float(result["pred_secure"]) - float(result["pred_encoded"]))
-            r1, r2, r3 = st.columns(3)
+            r1, r2 = st.columns(2)
             r1.metric("Разность PHE и Baseline", f"{delta_phe_baseline:.6f}")
             r2.metric("Разность PHE и Encoded", f"{delta_phe_encoded:.6f}")
-            r3.metric("Близость к baseline", "ДА" if delta_phe_baseline < 0.01 else "НЕТ")
     else:
         k1.metric("Server sees plaintext", "NO")
-        k2.metric("Prediction matches baseline", "—")
+        k2.metric("Совпадение с baseline", "—")
         k3.metric("Payload overhead", "—")
         k4.metric("Encrypted payload", "—")
         k5.metric("Plaintext payload", "—")
