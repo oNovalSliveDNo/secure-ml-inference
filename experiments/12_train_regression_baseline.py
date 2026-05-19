@@ -32,11 +32,12 @@ CSV_HEADERS = [
     "mse",
     "rmse",
     "r2",
-    "diff_mae",
-    "diff_mse",
-    "diff_rmse",
-    "diff_r2",
-    "match_rate_tol_1e_2",
+    "mean_abs_diff_vs_plaintext",
+    "max_abs_diff_vs_plaintext",
+    "mean_abs_diff_vs_encoded",
+    "max_abs_diff_vs_encoded",
+    "match_rate_vs_plaintext_tol_1e_2",
+    "match_rate_vs_encoded_tol_1e_2",
 ]
 
 
@@ -60,11 +61,12 @@ def _write_baseline_quality_row(metrics: dict[str, float]) -> None:
         "mse": metrics["mse"],
         "rmse": metrics["rmse"],
         "r2": metrics["r2"],
-        "diff_mae": 0.0,
-        "diff_mse": 0.0,
-        "diff_rmse": 0.0,
-        "diff_r2": 0.0,
-        "match_rate_tol_1e_2": 1.0,
+        "mean_abs_diff_vs_plaintext": 0.0,
+        "max_abs_diff_vs_plaintext": 0.0,
+        "mean_abs_diff_vs_encoded": 0.0,
+        "max_abs_diff_vs_encoded": 0.0,
+        "match_rate_vs_plaintext_tol_1e_2": 1.0,
+        "match_rate_vs_encoded_tol_1e_2": 1.0,
     }
     with QUALITY_CSV_PATH.open("w", encoding="utf-8", newline="") as file_obj:
         writer = csv.DictWriter(file_obj, fieldnames=CSV_HEADERS)

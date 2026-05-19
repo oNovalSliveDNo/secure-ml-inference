@@ -1,10 +1,17 @@
 """Experiment 13: Evaluate encoded and PHE regression inference quality."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import csv
 import logging
+import sys
 from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 import joblib
 import numpy as np
@@ -142,15 +149,6 @@ def main() -> None:
     logger.info("Encoded metrics: %s", encoded_metrics)
     logger.info("PHE metrics: %s", phe_metrics)
 
-    _append_quality_row(
-        _build_row(
-            mode="Plaintext baseline",
-            metrics=_regression_metrics(y_true=y_true, y_pred=y_pred_baseline),
-            baseline_pred=y_pred_baseline,
-            encoded_pred=y_pred_baseline,
-            cur_pred=y_pred_baseline,
-        )
-    )
     _append_quality_row(
         _build_row(
             mode="Encoded plaintext",
