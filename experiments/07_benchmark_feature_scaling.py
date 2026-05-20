@@ -135,8 +135,19 @@ def main() -> None:
     total_vals = [float(row["total_mean_ms"]) for row in results]
     req_vals = [float(row["request_size_mean_bytes"]) for row in results]
     server_vals = [float(row["server_mean_ms"]) for row in results]
+    encryption_vals = [float(row["encryption_mean_ms"]) for row in results]
 
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    plt.figure()
+    plt.plot(counts, encryption_vals, marker="o", linestyle="-", linewidth=2, markersize=8)
+    plt.xlabel("Количество признаков", fontsize=12)
+    plt.ylabel("Среднее время шифрования, мс", fontsize=12)
+    plt.title("Зависимость времени шифрования от числа признаков", fontsize=14)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(PLOTS_DIR / "feature_count_vs_encryption_time.png", bbox_inches="tight")
+    plt.close()
 
     plt.figure()
     plt.plot(counts, total_vals, marker="o")
