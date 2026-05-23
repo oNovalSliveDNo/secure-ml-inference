@@ -125,10 +125,10 @@ def main() -> None:
         label="Mean absolute score error",
     )
 
-    axis_left.set_title("Impact of SCALE on Encoded Inference")
+    axis_left.set_title("Влияние SCALE на ошибку кодирования")
     axis_left.set_xlabel("SCALE")
-    axis_left.set_ylabel("Match rate")
-    axis_right.set_ylabel("Mean absolute score error")
+    axis_left.set_ylabel("Доля совпадений")
+    axis_right.set_ylabel("Средняя абсолютная ошибка линейного результата")
     axis_left.set_xscale("log")
     axis_left.set_xticks(scales)
     axis_left.set_xticklabels([str(scale) for scale in scales])

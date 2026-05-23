@@ -623,7 +623,7 @@ def show_architecture() -> None:
 
 def main() -> None:
     """Run the Streamlit application."""
-    st.title("Защищённый ML-инференс — Live Protocol Demo")
+    st.title("Защищённый ML-инференс — Демонстрация протокола в реальном времени")
     try:
         resources = load_resources()
     except FileNotFoundError as exc:
