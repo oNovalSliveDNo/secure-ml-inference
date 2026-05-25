@@ -1,4 +1,4 @@
-"""Experiment 09: Benchmark Paillier key lengths on one Breast Cancer sample."""
+"""Эксперимент 09: оценка влияния длины ключа Paillier на одном объекте Breast Cancer."""
 
 from __future__ import annotations
 
@@ -21,12 +21,19 @@ from app.model import extract_linear_params, load_model
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+
 MODEL_PATH = Path("results/models/model.pkl")
 TABLES_DIR = Path("results/tables")
 PLOTS_DIR = Path("results/plots")
+
 KEY_LENGTH_CSV_PATH = TABLES_DIR / "key_length_metrics.csv"
 KEY_LENGTH_PLOT_PATH = PLOTS_DIR / "key_length_comparison.png"
-KEY_LENGTHS = [512, 1024, 2048]  # 512-bit is INSECURE demo mode only.
+
+KEY_LENGTHS = [
+    512,
+    1024,
+    2048,
+]  # 512 бит используется только как небезопасный демонстрационный режим.
 
 CSV_HEADERS = [
     "key_length",
@@ -42,18 +49,20 @@ CSV_HEADERS = [
 
 
 def _mean(values: list[float]) -> float:
-    """Compute mean value for a list."""
+    """Вычислить среднее значение."""
     return float(np.mean(np.asarray(values, dtype=np.float64)))
 
 
 def _summarize(values: list[float]) -> tuple[float, float, float]:
-    """Compute mean, std, and median for measured values."""
+    """Вычислить среднее значение, стандартное отклонение и медиану."""
     arr = np.asarray(values, dtype=np.float64)
     return float(np.mean(arr)), float(np.std(arr)), float(np.median(arr))
 
 
 def main() -> None:
-    """Run key-length benchmark and save summary table."""
+    """Выполнить эксперимент по влиянию длины ключа и сохранить результаты."""
+    logger.info("Запуск эксперимента по влиянию длины ключа Paillier...")
+
     model = load_model(str(MODEL_PATH))
     features, target = load_dataset()
     _, x_test, _, _ = split_dataset(
@@ -65,12 +74,13 @@ def main() -> None:
 
     scaler = model.named_steps["scaler"]
     w, b = extract_linear_params(model)
+
     w_int = encode_weights(w=w, scale=SCALE)
     b_int = encode_bias(b=b, scale=SCALE)
 
-    sample = x_test.iloc[[0]]  # DataFrame
+    sample = x_test.iloc[[0]]
     x_scaled = scaler.transform(sample)[0]
-    encoded_sample = [int(v) for v in encode_vector(x=x_scaled, scale=SCALE).tolist()]
+    encoded_sample = [int(value) for value in encode_vector(x=x_scaled, scale=SCALE).tolist()]
 
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -95,10 +105,10 @@ def main() -> None:
             t1 = time.perf_counter()
             keygen_ms_values.append((t1 - t0) * 1000.0)
 
-            t_init_start = time.perf_counter()
+            t0 = time.perf_counter()
             server = Server(w_int=w_int, b_int=b_int, public_key=public_key)
-            t_init_end = time.perf_counter()
-            server_init_ms_values.append((t_init_end - t_init_start) * 1000.0)
+            t1 = time.perf_counter()
+            server_init_ms_values.append((t1 - t0) * 1000.0)
 
             t0 = time.perf_counter()
             encrypted_vector = encrypt_vector(public_key=public_key, x_int=encoded_sample)
@@ -110,7 +120,9 @@ def main() -> None:
                 "public_key_n": str(public_key.n),
                 "scale": SCALE,
             }
-            request_sizes.append(float(len(json.dumps(request_payload).encode("utf-8"))))
+            request_sizes.append(
+                float(len(json.dumps(request_payload, ensure_ascii=False).encode("utf-8")))
+            )
 
             t0 = time.perf_counter()
             encrypted_score = server.compute_encrypted_score(encrypted_vector)
@@ -131,12 +143,24 @@ def main() -> None:
                 + decryption_ms_values[-1]
             )
 
-        logger.info("Key length %d bits benchmarked.", key_length)
-        logger.info("  keygen mean/std/median: %s", _summarize(keygen_ms_values))
-        logger.info("  encryption mean/std/median: %s", _summarize(encryption_ms_values))
-        logger.info("  server_init mean/std/median: %s", _summarize(server_init_ms_values))
-        logger.info("  server mean/std/median: %s", _summarize(server_ms_values))
-        logger.info("  decryption mean/std/median: %s", _summarize(decryption_ms_values))
+        logger.info("Длина ключа %d бит обработана.", key_length)
+        logger.info(
+            "  Генерация ключей, среднее/ст. отклонение/медиана: %s", _summarize(keygen_ms_values)
+        )
+        logger.info(
+            "  Шифрование, среднее/ст. отклонение/медиана: %s", _summarize(encryption_ms_values)
+        )
+        logger.info(
+            "  Инициализация сервера, среднее/ст. отклонение/медиана: %s",
+            _summarize(server_init_ms_values),
+        )
+        logger.info(
+            "  Серверное вычисление, среднее/ст. отклонение/медиана: %s",
+            _summarize(server_ms_values),
+        )
+        logger.info(
+            "  Расшифрование, среднее/ст. отклонение/медиана: %s", _summarize(decryption_ms_values)
+        )
 
         rows.append(
             {
@@ -157,8 +181,6 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
 
-    logger.info("Saved key-length metrics to %s", KEY_LENGTH_CSV_PATH)
-
     key_lengths = [int(row["key_length"]) for row in rows]
     total_with_keygen = [float(row["total_with_keygen_ms_mean"]) for row in rows]
     total_without_keygen = [float(row["total_without_keygen_ms_mean"]) for row in rows]
@@ -168,22 +190,41 @@ def main() -> None:
     fig, axis_left = plt.subplots(figsize=(9, 5))
     axis_right = axis_left.twinx()
 
-    axis_left.plot(key_lengths, total_with_keygen, marker="o", label="Total with keygen (ms)")
-    axis_left.plot(key_lengths, total_without_keygen, marker="o", label="Total without keygen (ms)")
-    axis_left.plot(key_lengths, encryption_time, marker="o", label="Encryption time (ms)")
+    axis_left.plot(
+        key_lengths,
+        total_with_keygen,
+        marker="o",
+        linewidth=2,
+        label="Общее время с генерацией ключей, мс",
+    )
+    axis_left.plot(
+        key_lengths,
+        total_without_keygen,
+        marker="o",
+        linewidth=2,
+        label="Общее время без генерации ключей, мс",
+    )
+    axis_left.plot(
+        key_lengths,
+        encryption_time,
+        marker="o",
+        linewidth=2,
+        label="Время шифрования, мс",
+    )
     axis_right.plot(
         key_lengths,
         request_size,
         marker="s",
         linestyle="--",
+        linewidth=2,
         color="tab:purple",
-        label="Request size (bytes)",
+        label="Размер запроса, байт",
     )
 
-    axis_left.set_title("Key Length Benchmark Comparison")
-    axis_left.set_xlabel("Key length (bits)")
-    axis_left.set_ylabel("Time (ms)")
-    axis_right.set_ylabel("Request size (bytes)")
+    axis_left.set_title("Влияние длины ключа Paillier на время и размер запроса")
+    axis_left.set_xlabel("Длина ключа, бит")
+    axis_left.set_ylabel("Время, мс")
+    axis_right.set_ylabel("Размер запроса, байт")
     axis_left.set_xticks(key_lengths)
     axis_left.grid(True, alpha=0.3)
 
@@ -192,9 +233,12 @@ def main() -> None:
     axis_left.legend(left_handles + right_handles, left_labels + right_labels, loc="upper left")
 
     fig.tight_layout()
-    fig.savefig(KEY_LENGTH_PLOT_PATH, dpi=160)
+    fig.savefig(KEY_LENGTH_PLOT_PATH, dpi=160, bbox_inches="tight")
     plt.close(fig)
-    logger.info("Saved key-length plot to %s", KEY_LENGTH_PLOT_PATH)
+
+    logger.info("Метрики сохранены в %s", KEY_LENGTH_CSV_PATH)
+    logger.info("График сохранён в %s", KEY_LENGTH_PLOT_PATH)
+    logger.info("Эксперимент по влиянию длины ключа завершён.")
 
 
 if __name__ == "__main__":

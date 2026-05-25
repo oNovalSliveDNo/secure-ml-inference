@@ -1,5 +1,5 @@
 # ui/streamlit_app.py
-"""Streamlit demo UI for secure ML inference."""
+"""Интерфейс Streamlit для демонстрации защищённого предсказания модели."""
 
 from __future__ import annotations
 
@@ -22,13 +22,12 @@ from app.encoding import decode_score, encoded_plaintext_score
 from app.metrics import measure_payload_size
 from app.model import extract_linear_params, load_model
 
-st.set_page_config(page_title="Защищённый ML-инференс — Демонстрация", layout="wide")
+st.set_page_config(page_title="Защищённое предсказание модели — демонстрация", layout="wide")
 
 MODEL_PATH = Path("results/models/model.pkl")
 REGRESSION_MODEL_PATH = Path("results/models/regression_model.pkl")
 TABLES_DIR = Path("results/tables")
 PLOTS_DIR = Path("results/plots")
-SCHEMES_DIR = Path("docs/schemes")
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 
@@ -50,32 +49,139 @@ def _get_table_explanation(csv_name: str, df: pd.DataFrame) -> str:
         if numeric_df.shape[1] >= 2:
             delta = abs(float(numeric_df.iloc[:, 0].mean()) - float(numeric_df.iloc[:, 1].mean()))
             if delta < 1e-6:
-                return "Точность модели не изменилась при переходе к зашифрованному инференсу."
-        return "Таблица демонстрирует сопоставимое качество модели в открытом и защищённом режимах."
+                return "Точность модели не изменилась при переходе к защищённому режиму."
+        return "Таблица показывает, что качество обычного и защищённого расчёта сопоставимо."
 
     if "latency" in lower_name or "time" in lower_name or "timing" in lower_name:
-        return "Таблица показывает структуру задержек протокола и вклад каждого этапа вычислений."
+        return "Таблица показывает, сколько времени занимает каждый этап работы системы."
 
     if "overhead" in lower_name or "payload" in lower_name:
-        return "Таблица отражает сетевые издержки и дополнительный объём данных из-за шифрования."
+        return "Таблица показывает, насколько увеличивается объём передаваемых данных из-за шифрования."
 
     if not numeric_df.empty:
-        return "Таблица фиксирует количественные результаты экспериментов для проверки воспроизводимости."
-    return "Таблица содержит вспомогательные экспериментальные сведения и контекст измерений."
+        return "Таблица содержит численные результаты экспериментов."
+    return "Таблица содержит дополнительные сведения по экспериментам."
 
 
 def _get_plot_explanation(plot_name: str) -> str:
     """Return a concise Russian explanation for plot."""
     lower_name = plot_name.lower()
     if "latency" in lower_name or "time" in lower_name or "timing" in lower_name:
-        return "График показывает, как меняется время выполнения при росте вычислительной нагрузки."
+        return "График показывает, как меняется время работы системы при увеличении нагрузки."
     if "feature" in lower_name or "dim" in lower_name:
-        return "График иллюстрирует зависимость затрат протокола от числа признаков."
+        return "График показывает, как число признаков влияет на время работы и размер данных."
     if "accuracy" in lower_name or "auc" in lower_name:
-        return "График подтверждает сохранение качества модели в защищённом контуре инференса."
+        return "График показывает, что качество модели сохраняется в защищённом режиме."
     if "payload" in lower_name or "size" in lower_name or "overhead" in lower_name:
-        return "График показывает рост сетевой нагрузки, вызванный передачей шифртекстов."
-    return "График визуализирует экспериментальные результаты и подтверждает наблюдаемую динамику метрик."
+        return "График показывает рост объёма передаваемых данных из-за шифрования."
+    return "График показывает экспериментальные результаты в наглядном виде."
+
+
+def _get_artifact_title(file_name: str) -> str:
+    """Return a readable Russian title for result files."""
+    lower_name = file_name.lower()
+    title_by_keyword = {
+        "quality": "качество предсказаний",
+        "accuracy": "качество предсказаний",
+        "latency": "время выполнения",
+        "time": "время выполнения",
+        "payload": "размер передаваемых данных",
+        "overhead": "дополнительные затраты",
+        "feature": "влияние числа признаков",
+        "dataset": "сравнение наборов данных",
+        "key": "влияние длины ключа",
+        "scale": "влияние масштаба кодирования",
+        "roundtrip": "полный запрос через сервер",
+        "regression": "результаты регрессии",
+        "classification": "результаты классификации",
+    }
+    for keyword, title in title_by_keyword.items():
+        if keyword in lower_name:
+            return title
+    return file_name
+
+
+_COLUMN_TRANSLATIONS = {
+    "method": "Метод",
+    "mode": "Режим",
+    "scenario": "Тип задачи",
+    "task": "Тип задачи",
+    "dataset": "Набор данных",
+    "stage": "Этап",
+    "metric": "Метрика",
+    "value": "Значение",
+    "mean": "Среднее значение",
+    "std": "Стандартное отклонение",
+    "min": "Минимум",
+    "max": "Максимум",
+    "mean_ms": "Среднее время, мс",
+    "std_ms": "Отклонение, мс",
+    "median_ms": "Медианное время, мс",
+    "total_ms": "Общее время, мс",
+    "encryption_ms": "Время шифрования, мс",
+    "decryption_ms": "Время расшифровки, мс",
+    "server_compute_ms": "Время расчёта на сервере, мс",
+    "http_elapsed_ms": "Полное время запроса, мс",
+    "accuracy": "Доля верных ответов",
+    "precision": "Точность положительного класса",
+    "recall": "Полнота",
+    "f1": "F1-мера",
+    "roc_auc": "ROC-AUC",
+    "match_rate": "Доля совпадений",
+    "mae": "Средняя абсолютная ошибка",
+    "mse": "Среднеквадратичная ошибка",
+    "rmse": "Корень из среднеквадратичной ошибки",
+    "r2": "Коэффициент детерминации R²",
+    "plaintext_bytes": "Размер обычного запроса, байт",
+    "encrypted_bytes": "Размер зашифрованного запроса, байт",
+    "payload_bytes": "Размер данных, байт",
+    "request_bytes": "Размер запроса, байт",
+    "response_bytes": "Размер ответа, байт",
+    "overhead_ratio": "Увеличение размера",
+    "feature_count": "Число признаков",
+    "key_length": "Длина ключа",
+    "scale": "Масштаб кодирования",
+    "sample_count": "Число объектов",
+}
+
+
+_VALUE_TRANSLATIONS = {
+    "baseline": "Обычная модель без защиты",
+    "plaintext": "Обычный расчёт",
+    "plaintext_baseline": "Обычная модель без защиты",
+    "encoded": "Открытый расчёт после кодирования",
+    "encoded_plaintext": "Открытый расчёт после кодирования",
+    "phe": "Защищённый расчёт",
+    "phe_inference": "Защищённый расчёт по зашифрованным данным",
+    "encrypted": "Зашифрованный режим",
+    "classification": "Классификация",
+    "regression": "Регрессия",
+    "keygen": "Генерация ключей",
+    "key_generation": "Генерация ключей",
+    "scaling": "Масштабирование признаков",
+    "encoding": "Кодирование признаков",
+    "encryption": "Шифрование признаков",
+    "server_compute": "Расчёт на сервере",
+    "decryption": "Расшифровка результата",
+    "postprocessing": "Получение итогового прогноза",
+    "total": "Общее время",
+    "total_without_keygen": "Общее время без генерации ключей",
+}
+
+
+def _prepare_display_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Translate common experiment table labels for the Streamlit page."""
+    display_df = df.copy()
+    display_df = display_df.rename(
+        columns={column: _COLUMN_TRANSLATIONS.get(column, column) for column in display_df.columns}
+    )
+
+    for column in display_df.select_dtypes(include="object").columns:
+        display_df[column] = display_df[column].map(
+            lambda value: _VALUE_TRANSLATIONS.get(value, value) if isinstance(value, str) else value
+        )
+
+    return display_df
 
 
 @st.cache_resource
@@ -94,7 +200,7 @@ def load_resources() -> dict[str, Any]:
         )
         w_cls, b_cls = extract_linear_params(cls_model)
         scenarios["classification"] = {
-            "title": "Классификация (Breast Cancer)",
+            "title": "Классификация: диагностика опухоли",
             "task_type": "classification",
             "model": cls_model,
             "scaler": cls_model.named_steps["scaler"],
@@ -122,7 +228,7 @@ def load_resources() -> dict[str, Any]:
         w_reg = ridge.coef_.ravel()
         b_reg = float(ridge.intercept_)
         scenarios["regression"] = {
-            "title": "Регрессия (Diabetes)",
+            "title": "Регрессия: числовой медицинский прогноз",
             "task_type": "regression",
             "model": reg_model,
             "scaler": scaler,
@@ -142,7 +248,7 @@ def load_resources() -> dict[str, Any]:
 
 def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     """Render step-by-step interactive protocol demo."""
-    st.header("Демонстрация протокола")
+    st.header("Пошаговая демонстрация")
 
     # Модель загружается исключительно для демонстрационного сравнения.
     # В защищённом протоколе клиент не использует веса модели.
@@ -153,7 +259,7 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
 
     scenarios = resources["scenarios"]
     scenario_id = st.radio(
-        "Сценарий инференса",
+        "Тип задачи",
         options=list(scenarios.keys()),
         format_func=lambda sid: scenarios[sid]["title"],
         horizontal=True,
@@ -242,8 +348,8 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                     pd.DataFrame(
                         {
                             "Признак": sample.index,
-                            "Raw": sample.values,
-                            "Scaled": result["x_scaled"],
+                            "Исходное значение": sample.values,
+                            "После масштабирования": result["x_scaled"],
                         }
                     ),
                     width="stretch",
@@ -259,7 +365,12 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                 st.rerun()
             if "x_int" in result:
                 st.dataframe(
-                    pd.DataFrame({"Scaled": result["x_scaled"], "Encoded (int)": result["x_int"]}),
+                    pd.DataFrame(
+                        {
+                            "После масштабирования": result["x_scaled"],
+                            "Целое число": result["x_int"],
+                        }
+                    ),
                     width="stretch",
                 )
 
@@ -276,12 +387,13 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                 st.rerun()
             if "enc_x" in result:
                 client = result["client"]
-                st.code(f"public_key_n: {str(client.public_key.n)[:48]}...")
+                st.caption("Открытая часть ключа, которая передаётся серверу:")
+                st.code(f"n = {str(client.public_key.n)[:48]}...")
                 st.dataframe(
                     pd.DataFrame(
                         {
-                            "Encoded": result["x_int"],
-                            "Encrypted": [
+                            "Целое число": result["x_int"],
+                            "Зашифрованное значение": [
                                 serialize_ciphertext(v)[:36] + "..." for v in result["enc_x"]
                             ],
                             "Размер (байт)": [
@@ -311,13 +423,13 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                     response = requests.post(f"{API_URL}/infer/encrypted", json=payload, timeout=30)
                     response.raise_for_status()
                 except requests.RequestException as exc:
-                    st.error(f"Ошибка при обращении к API ({API_URL}): {exc}")
+                    st.error(f"Ошибка при обращении к серверу ({API_URL}): {exc}")
                     return
                 http_elapsed_ms = (time.perf_counter() - t_http0) * 1000.0
                 response_payload = response.json()
                 encrypted_score_str = response_payload.get("encrypted_score")
                 if not isinstance(encrypted_score_str, str):
-                    st.error("Некорректный ответ API: отсутствует поле encrypted_score.")
+                    st.error("Некорректный ответ сервера: отсутствует зашифрованный результат.")
                     return
                 result.update(
                     {
@@ -333,17 +445,18 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             if "request_payload" in result:
                 st.json(
                     {
-                        "public_key_n": result["request_payload"]["public_key_n"][:32] + "...",
-                        "encrypted_features": [
+                        "Открытая часть ключа": result["request_payload"]["public_key_n"][:32]
+                        + "...",
+                        "Первые зашифрованные признаки": [
                             c[:32] + "..."
                             for c in result["request_payload"]["encrypted_features"][:3]
                         ],
-                        "scale": result["request_payload"]["scale"],
-                        "feature_count": result["request_payload"]["feature_count"],
+                        "Масштаб кодирования": result["request_payload"]["scale"],
+                        "Количество признаков": result["request_payload"]["feature_count"],
                     }
                 )
                 st.write(
-                    f"HTTP-статус: {result['status_code']}, server_compute_ms: {result['server_compute_ms']}"
+                    f"Статус ответа сервера: {result['status_code']}; время вычисления на сервере: {result['server_compute_ms']} мс"
                 )
 
     if current_step >= 5:
@@ -367,11 +480,14 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                     pd.DataFrame(
                         [
                             {
-                                "Этап": "Encrypted score",
+                                "Этап": "Зашифрованный результат",
                                 "Значение": result["encrypted_score"][:80] + "...",
                             },
-                            {"Этап": "score_int", "Значение": result["score_int"]},
-                            {"Этап": "z", "Значение": f"{result['z_secure']:.6f}"},
+                            {"Этап": "Целочисленный результат", "Значение": result["score_int"]},
+                            {
+                                "Этап": "Расшифрованное значение z",
+                                "Значение": f"{result['z_secure']:.6f}",
+                            },
                         ]
                     ),
                     width="stretch",
@@ -416,28 +532,28 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                     result["comparison_df"] = pd.DataFrame(
                         [
                             {
-                                "Метод": "Baseline",
-                                "Linear score": z_baseline,
-                                "Probability": prob_baseline,
-                                "Class": pred_baseline,
+                                "Метод": "Обычная модель без защиты",
+                                "Линейный результат z": z_baseline,
+                                "Вероятность класса 1": prob_baseline,
+                                "Класс": pred_baseline,
                             },
                             {
-                                "Метод": "Encoded plaintext",
-                                "Linear score": z_encoded,
-                                "Probability": prob_encoded,
-                                "Class": pred_encoded,
+                                "Метод": "Открытый расчёт после кодирования",
+                                "Линейный результат z": z_encoded,
+                                "Вероятность класса 1": prob_encoded,
+                                "Класс": pred_encoded,
                             },
                             {
-                                "Метод": "PHE inference",
-                                "Linear score": result["z_secure"],
-                                "Probability": prob_secure,
-                                "Class": pred_secure,
+                                "Метод": "Защищённый расчёт по зашифрованным данным",
+                                "Линейный результат z": result["z_secure"],
+                                "Вероятность класса 1": prob_secure,
+                                "Класс": pred_secure,
                             },
                             {
                                 "Метод": "Истинная метка",
-                                "Linear score": None,
-                                "Probability": None,
-                                "Class": int(y_test.iloc[sample_idx]),
+                                "Линейный результат z": None,
+                                "Вероятность класса 1": None,
+                                "Класс": int(y_test.iloc[sample_idx]),
                             },
                         ]
                     )
@@ -454,12 +570,18 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                     )
                     result["comparison_df"] = pd.DataFrame(
                         [
-                            {"Метод": "Baseline", "Predicted value": pred_baseline_value},
-                            {"Метод": "Encoded plaintext", "Predicted value": pred_encoded_value},
-                            {"Метод": "PHE inference", "Predicted value": pred_secure_value},
+                            {"Метод": "Обычная модель без защиты", "Прогноз": pred_baseline_value},
+                            {
+                                "Метод": "Открытый расчёт после кодирования",
+                                "Прогноз": pred_encoded_value,
+                            },
+                            {
+                                "Метод": "Защищённый расчёт по зашифрованным данным",
+                                "Прогноз": pred_secure_value,
+                            },
                             {
                                 "Метод": "Истинное значение",
-                                "Predicted value": float(y_test.iloc[sample_idx]),
+                                "Прогноз": float(y_test.iloc[sample_idx]),
                             },
                         ]
                     )
@@ -481,61 +603,55 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
 
     k1, k2, k3, k4, k5 = st.columns(5)
     if "overhead_ratio" in result:
-        k1.metric("Server sees plaintext", "NO")
+        k1.metric("Сервер видит исходные признаки", "НЕТ")
 
         if scenario_id == "classification":
             match_label = (
                 "ДА" if result.get("pred_secure") == result.get("pred_baseline") else "НЕТ"
             )
-            k2.metric("Совпадение с baseline", match_label)
+            k2.metric("Совпадение с обычной моделью", match_label)
         else:
             delta_phe_baseline = abs(float(result["pred_secure"]) - float(result["pred_baseline"]))
             match_label = "ДА" if delta_phe_baseline < 0.01 else "НЕТ"
             k2.metric(
-                "Прогноз близок к baseline",
+                "Прогноз близок к обычной модели",
                 match_label,
                 delta=f"Δ = {delta_phe_baseline:.4f}",
             )
 
-        k3.metric("Payload overhead", f"{result['overhead_ratio']:.2f}x")
-        k4.metric("Encrypted payload", f"{result['encrypted_bytes']} B")
-        k5.metric("Plaintext payload", f"{result['plaintext_bytes']} B")
+        k3.metric("Увеличение размера запроса", f"{result['overhead_ratio']:.2f}x")
+        k4.metric("Зашифрованный запрос", f"{result['encrypted_bytes']} байт")
+        k5.metric("Обычный запрос", f"{result['plaintext_bytes']} байт")
 
         if scenario_id == "regression":
             delta_phe_encoded = abs(float(result["pred_secure"]) - float(result["pred_encoded"]))
             r1, r2 = st.columns(2)
-            r1.metric("Разность PHE и Baseline", f"{delta_phe_baseline:.6f}")
-            r2.metric("Разность PHE и Encoded", f"{delta_phe_encoded:.6f}")
+            r1.metric("Разность защищённого и обычного прогноза", f"{delta_phe_baseline:.6f}")
+            r2.metric("Разность защищённого и кодированного прогноза", f"{delta_phe_encoded:.6f}")
     else:
-        k1.metric("Server sees plaintext", "NO")
-        k2.metric("Совпадение с baseline", "—")
-        k3.metric("Payload overhead", "—")
-        k4.metric("Encrypted payload", "—")
-        k5.metric("Plaintext payload", "—")
-
-    # scheme_files = sorted(SCHEMES_DIR.glob("*.png"))
-    # if scheme_files:
-    #     st.subheader("Схемы протокола")
-    #     for scheme in scheme_files:
-    #         st.image(str(scheme), caption=scheme.name, width="stretch")
+        k1.metric("Сервер видит исходные признаки", "НЕТ")
+        k2.metric("Совпадение с обычной моделью", "—")
+        k3.metric("Увеличение размера запроса", "—")
+        k4.metric("Зашифрованный запрос", "—")
+        k5.metric("Обычный запрос", "—")
 
 
 def show_metrics_dashboard() -> None:
     """Render experiment evidence with explanatory comments."""
-    st.header("Экспериментальные свидетельства")
+    st.header("Результаты экспериментов")
 
     csv_files = sorted(TABLES_DIR.glob("*.csv"))
     plot_files = sorted(PLOTS_DIR.glob("*.png"))
 
     if not csv_files and not plot_files:
         st.info(
-            "Экспериментальные артефакты не найдены. Запустите сценарии в директории experiments/, чтобы сформировать таблицы и графики."
+            "Результаты экспериментов не найдены. Запустите сценарии в директории experiments/, чтобы сформировать таблицы и графики."
         )
         return
 
     if not csv_files:
         st.info(
-            "CSV-файлы с метриками отсутствуют в results/tables/. Запустите эксперименты для формирования табличных результатов."
+            "Файлы с таблицами метрик отсутствуют в results/tables/. Запустите эксперименты для формирования табличных результатов."
         )
 
     for csv_file in csv_files:
@@ -544,8 +660,9 @@ def show_metrics_dashboard() -> None:
         except Exception as exc:
             st.warning(f"Не удалось прочитать {csv_file.name}: {exc}")
             continue
-        st.subheader(f"Таблица: {csv_file.name}")
-        st.dataframe(df, width="stretch")
+        st.subheader(f"Таблица: {_get_artifact_title(csv_file.name)}")
+        st.caption(f"Файл с результатами: `{csv_file.name}`")
+        st.dataframe(_prepare_display_dataframe(df), width="stretch")
 
         if csv_file.name == "latency_metrics.csv" and {"stage", "mean_ms"}.issubset(df.columns):
             totals = df.set_index("stage")["mean_ms"].to_dict()
@@ -554,76 +671,87 @@ def show_metrics_dashboard() -> None:
             if total_with_keygen is not None and total_without_keygen is not None:
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.metric("Общее время (с keygen), ms", f"{total_with_keygen:.2f}")
+                    st.metric("Общее время с генерацией ключей, мс", f"{total_with_keygen:.2f}")
                 with col2:
-                    st.metric("Общее время (без keygen), ms", f"{total_without_keygen:.2f}")
+                    st.metric("Общее время без генерации ключей, мс", f"{total_without_keygen:.2f}")
 
         st.markdown(f"**Интерпретация:** {_get_table_explanation(csv_file.name, df)}")
 
     if not plot_files:
         st.info(
-            "Файлы графиков отсутствуют в results/plots/. Запустите эксперименты визуализации результатов."
+            "Файлы с графиками отсутствуют в results/plots/. Запустите эксперименты визуализации результатов."
         )
 
     for plot_file in plot_files:
-        st.subheader(f"График: {plot_file.name}")
+        st.subheader(f"График: {_get_artifact_title(plot_file.name)}")
+        st.caption(f"Файл с графиком: `{plot_file.name}`")
         st.image(str(plot_file), width="stretch")
         st.markdown(f"**Вывод:** {_get_plot_explanation(plot_file.name)}")
 
 
 def show_architecture() -> None:
-    """Render architecture description tab."""
+    """Render architecture and threat model without image schemes."""
     st.header("Архитектура и модель угроз")
     st.markdown(
         """
-### Поток защищённого инференса
-1. **Клиент**: исходные признаки → стандартизация → кодирование с фиксированной точкой (`SCALE`) → шифрование Пайе.
-2. **Сервер**: получает только зашифрованные признаки и открытый ключ, вычисляет зашифрованный линейный score `Enc(z_int)`.
-3. **Клиент**:
-   * Для классификации: вычисляет сигмоиду и пороговое правило.
-   * Для регрессии: расшифрованное значение является числовым прогнозом.
+### Как работает система
 
-### Граница доверия
-- Сервер никогда не видит открытые признаки и не имеет доступа к закрытому ключу.
-- Клиент не передаёт параметры модели на сервер; сервер хранит только закодированные веса.
+1. **Клиент подготавливает данные.**
+   Пользователь выбирает объект из тестовой выборки. На стороне клиента признаки масштабируются,
+   переводятся в целые числа и шифруются.
+
+2. **Сервер получает только зашифрованные признаки.**
+   Сервер не видит исходные значения признаков. Он получает открытую часть ключа,
+   набор зашифрованных чисел и служебные параметры, необходимые для расчёта.
+
+3. **Сервер выполняет расчёт над зашифрованными данными.**
+   Сервер использует заранее обученную модель и возвращает клиенту зашифрованный результат
+   линейного вычисления.
+
+4. **Клиент расшифровывает результат.**
+   Закрытый ключ хранится только у клиента. После расшифровки клиент получает итоговое значение:
+   для классификации — класс объекта, для регрессии — числовой прогноз.
+
+### Что защищается
+
+- исходные признаки клиента;
+- промежуточный результат расчёта до расшифровки;
+- закрытый ключ, который не покидает сторону клиента.
+
+### Что видит сервер
+
+- открытую часть ключа;
+- зашифрованные признаки;
+- количество признаков;
+- выбранный тип задачи;
+- служебные параметры кодирования.
+
+### Что сервер не видит
+
+- исходные значения признаков;
+- закрытый ключ клиента;
+- расшифрованный результат вычисления.
 
 ### Модель угроз
-- Предполагается честный, но любопытный сервер: сервер корректно исполняет протокол, но пытается извлечь сведения из наблюдаемых данных.
-- Канал связи может наблюдаться внешним нарушителем, поэтому передаются только шифртексты и служебные открытые параметры.
-- Закрытый ключ хранится только у клиента, что исключает восстановление признаков и линейного score на стороне сервера.
 
-### Формат сообщений
-- **Запрос**: `public_key_n`, `encrypted_features[]`, `scale`
-- **Ответ**: `encrypted_score`
+В демонстрации рассматривается сервер, который корректно выполняет протокол,
+но может пытаться извлечь информацию из полученных данных. Такая модель подходит
+для сценария удалённого применения машинного обучения, когда клиент не хочет
+раскрывать свои данные серверной стороне.
+
+### Ограничения демонстрации
+
+- модель сервера не скрывается от самого сервера;
+- факт обращения к серверу и технические метаданные не защищаются;
+- активные атаки, компрометация клиента и атаки по побочным каналам не рассматриваются;
+- прототип предназначен для демонстрации и экспериментальной оценки, а не для промышленного внедрения без дополнительной защиты.
         """
     )
-
-    st.subheader("Схемы для презентации протокола")
-    required_schemes = [
-        "protocol_flow.png",
-        "threat_model.png",
-        "math_flow.png",
-        "plaintext_vs_encoded_vs_phe.png",
-    ]
-    missing_schemes = [name for name in required_schemes if not (SCHEMES_DIR / name).exists()]
-    if missing_schemes:
-        st.warning(
-            "Не найдены схемы: "
-            + ", ".join(missing_schemes)
-            + ". Запустите `python experiments/generate_schemes.py`."
-        )
-    else:
-        st.success("Все схемы найдены и готовы для встраивания.")
-
-    for scheme_name in required_schemes:
-        scheme_path = SCHEMES_DIR / scheme_name
-        if scheme_path.exists():
-            st.image(str(scheme_path), caption=scheme_name, width="stretch")
 
 
 def main() -> None:
     """Run the Streamlit application."""
-    st.title("Защищённый ML-инференс — Демонстрация протокола в реальном времени")
+    st.title("Защищённое предсказание модели — пошаговая демонстрация")
     try:
         resources = load_resources()
     except FileNotFoundError as exc:
@@ -631,7 +759,7 @@ def main() -> None:
         st.stop()
 
     tab1, tab2, tab3 = st.tabs(
-        ["Демонстрация протокола", "Экспериментальные свидетельства", "Архитектура и модель угроз"]
+        ["Пошаговая демонстрация", "Результаты экспериментов", "Архитектура и модель угроз"]
     )
 
     with tab1:

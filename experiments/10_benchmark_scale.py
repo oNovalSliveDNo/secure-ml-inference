@@ -1,4 +1,4 @@
-"""Experiment 10: Benchmark impact of SCALE on fixed-point and PHE agreement."""
+"""Эксперимент 10: оценка влияния SCALE на точность кодирования и совпадение с PHE."""
 
 from __future__ import annotations
 
@@ -19,21 +19,31 @@ from app.model import compute_manual_score, extract_linear_params, load_model
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+
 MODEL_PATH = Path("results/models/model.pkl")
 TABLES_DIR = Path("results/tables")
 PLOTS_DIR = Path("results/plots")
+
 SCALE_CSV_PATH = TABLES_DIR / "scale_metrics.csv"
 SCALE_PLOT_PATH = PLOTS_DIR / "scale_impact.png"
+
 SCALE_VALUES = [100, 1000, 10000, 100000]
 PHE_SUBSET_SIZE = 15
 PHE_KEY_LENGTH = 512
 
-CSV_HEADERS = ["scale", "encoded_match_rate", "mean_abs_score_error", "phe_match_rate"]
+CSV_HEADERS = [
+    "scale",
+    "encoded_match_rate",
+    "mean_abs_score_error",
+    "phe_match_rate",
+]
 
 
 def main() -> None:
-    """Run SCALE sensitivity benchmark and write table."""
+    """Выполнить эксперимент по влиянию SCALE и сохранить таблицу результатов."""
     from app.data import load_dataset, split_dataset
+
+    logger.info("Запуск эксперимента по влиянию SCALE...")
 
     model = load_model(str(MODEL_PATH))
     features, target = load_dataset()
@@ -48,13 +58,15 @@ def main() -> None:
 
     scaler = model.named_steps["scaler"]
     w, b = extract_linear_params(model)
-    x_scaled = scaler.transform(x_test)  # DataFrame, предупреждений нет
+    x_scaled = scaler.transform(x_test)
 
-    # Compare linear score before sigmoid to avoid numerical instability near 0/1 probabilities.
+    # Ошибка оценивается по линейному результату до сигмоиды,
+    # чтобы не смешивать ошибку кодирования с нелинейной постобработкой.
     manual_scores = compute_manual_score(x=x_scaled, w=w, b=b)
 
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+
     rows: list[dict[str, float | int]] = []
 
     for scale in SCALE_VALUES:
@@ -65,24 +77,42 @@ def main() -> None:
             scale=scale,
             threshold=0.5,
         )
+
         encoded_scores = np.asarray(
-            [encoded_plaintext_score(x=sample, w=w, b=b, scale=scale) for sample in x_scaled],
+            [
+                encoded_plaintext_score(
+                    x=sample,
+                    w=w,
+                    b=b,
+                    scale=scale,
+                )
+                for sample in x_scaled
+            ],
             dtype=np.float64,
         )
 
         encoded_match_rate = float(np.mean(encoded_pred == baseline_pred))
         mean_abs_score_error = float(np.mean(np.abs(encoded_scores - manual_scores)))
 
-        client = Client(scaler=scaler, scale=scale, key_length=PHE_KEY_LENGTH)
+        client = Client(
+            scaler=scaler,
+            scale=scale,
+            key_length=PHE_KEY_LENGTH,
+        )
         server = Server(
             w_int=encode_weights(w=w, scale=scale),
             b_int=encode_bias(b=b, scale=scale),
             public_key=client.public_key,
         )
 
-        x_subset = x_test.iloc[:PHE_SUBSET_SIZE]  # DataFrame
+        x_subset = x_test.iloc[:PHE_SUBSET_SIZE]
         encoded_subset = encoded_pred[:PHE_SUBSET_SIZE]
-        phe_pred, _ = phe_inference_batch(client=client, server=server, x_raw=x_subset)
+
+        phe_pred, _ = phe_inference_batch(
+            client=client,
+            server=server,
+            x_raw=x_subset,
+        )
         phe_match_rate = float(np.mean(phe_pred == encoded_subset))
 
         rows.append(
@@ -93,8 +123,10 @@ def main() -> None:
                 "phe_match_rate": phe_match_rate,
             }
         )
+
         logger.info(
-            "SCALE=%d -> encoded_match_rate=%.6f, mean_abs_score_error=%.6f, phe_match_rate=%.6f",
+            "SCALE=%d: доля совпадений кодированного режима=%.6f, "
+            "средняя абсолютная ошибка=%.6f, доля совпадений PHE=%.6f",
             scale,
             encoded_match_rate,
             mean_abs_score_error,
@@ -106,8 +138,6 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
 
-    logger.info("Saved scale metrics to %s", SCALE_CSV_PATH)
-
     scales = [int(row["scale"]) for row in rows]
     encoded_match_rates = [float(row["encoded_match_rate"]) for row in rows]
     mean_abs_errors = [float(row["mean_abs_score_error"]) for row in rows]
@@ -115,18 +145,26 @@ def main() -> None:
     fig, axis_left = plt.subplots(figsize=(9, 5))
     axis_right = axis_left.twinx()
 
-    axis_left.plot(scales, encoded_match_rates, marker="o", color="tab:blue", label="Match rate")
+    axis_left.plot(
+        scales,
+        encoded_match_rates,
+        marker="o",
+        linewidth=2,
+        color="tab:blue",
+        label="Доля совпадений",
+    )
     axis_right.plot(
         scales,
         mean_abs_errors,
         marker="s",
         linestyle="--",
+        linewidth=2,
         color="tab:red",
-        label="Mean absolute score error",
+        label="Средняя абсолютная ошибка",
     )
 
-    axis_left.set_title("Влияние SCALE на ошибку кодирования")
-    axis_left.set_xlabel("SCALE")
+    axis_left.set_title("Влияние коэффициента SCALE на ошибку кодирования")
+    axis_left.set_xlabel("Коэффициент масштабирования SCALE")
     axis_left.set_ylabel("Доля совпадений")
     axis_right.set_ylabel("Средняя абсолютная ошибка линейного результата")
     axis_left.set_xscale("log")
@@ -140,9 +178,12 @@ def main() -> None:
     axis_left.legend(left_handles + right_handles, left_labels + right_labels, loc="lower right")
 
     fig.tight_layout()
-    fig.savefig(SCALE_PLOT_PATH, dpi=160)
+    fig.savefig(SCALE_PLOT_PATH, dpi=160, bbox_inches="tight")
     plt.close(fig)
-    logger.info("Saved scale plot to %s", SCALE_PLOT_PATH)
+
+    logger.info("Метрики сохранены в %s", SCALE_CSV_PATH)
+    logger.info("График сохранён в %s", SCALE_PLOT_PATH)
+    logger.info("Эксперимент по влиянию SCALE завершён.")
 
 
 if __name__ == "__main__":

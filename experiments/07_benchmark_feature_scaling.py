@@ -1,4 +1,4 @@
-"""Experiment 07: Benchmark impact of feature count on time and size."""
+"""Эксперимент 07: оценка влияния числа признаков на время и размер запроса."""
 
 from __future__ import annotations
 
@@ -29,32 +29,37 @@ CSV_PATH = TABLES_DIR / "feature_scaling_metrics.csv"
 
 
 def _ms(start: float, end: float) -> float:
-    """Convert time interval to milliseconds."""
+    """Преобразовать временной интервал в миллисекунды."""
     return (end - start) * 1000.0
 
 
 def main() -> None:
-    """Measure latency and payload scaling across top-k features."""
-    logger.info("Feature scaling benchmark...")
+    """Измерить масштабирование задержки и размера запроса при разном числе признаков."""
+    logger.info("Запуск эксперимента по влиянию числа признаков...")
 
     model = load_model(str(MODEL_PATH))
     features, target = load_dataset()
     _, x_test, _, _ = split_dataset(
-        features=features, target=target, test_size=TEST_SIZE, random_state=RANDOM_STATE
+        features=features,
+        target=target,
+        test_size=TEST_SIZE,
+        random_state=RANDOM_STATE,
     )
 
     scaler = model.named_steps["scaler"]
     w, b = extract_linear_params(model)
+
+    # Выбираются признаки с наибольшими по модулю весами модели.
     top_indices = np.argsort(np.abs(w))[::-1]
 
-    sample_raw = x_test.iloc[[0]]  # DataFrame с одной строкой
+    sample_raw = x_test.iloc[[0]]
     x_scaled_full = scaler.transform(sample_raw)[0]
 
     results: list[dict[str, float | int]] = []
 
     for k in FEATURE_COUNTS:
         if k <= 0 or k > len(w):
-            logger.warning("Skipping invalid feature count k=%s", k)
+            logger.warning("Пропуск некорректного числа признаков k=%s", k)
             continue
 
         idx = top_indices[:k]
@@ -71,13 +76,18 @@ def main() -> None:
             t_total_start = time.perf_counter()
 
             public_key, private_key = generate_keys(n_length=KEY_LENGTH)
+
             x_int_k = np.rint(x_scaled_k * SCALE).astype(np.int64)
             w_int_k = encode_weights(w=w_k, scale=SCALE)
             b_int = encode_bias(b=b, scale=SCALE)
+
             server = Server(w_int=w_int_k, b_int=b_int, public_key=public_key)
 
             t0 = time.perf_counter()
-            enc_x = encrypt_vector(public_key=public_key, x_int=[int(v) for v in x_int_k.tolist()])
+            enc_x = encrypt_vector(
+                public_key=public_key,
+                x_int=[int(value) for value in x_int_k.tolist()],
+            )
             t1 = time.perf_counter()
             encryption_ms.append(_ms(t0, t1))
 
@@ -115,6 +125,7 @@ def main() -> None:
         )
 
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
+
     with CSV_PATH.open("w", encoding="utf-8", newline="") as file_obj:
         writer = csv.DictWriter(
             file_obj,
@@ -128,57 +139,63 @@ def main() -> None:
             ],
         )
         writer.writeheader()
-        for row in results:
-            writer.writerow(row)
+        writer.writerows(results)
 
     counts = [int(row["feature_count"]) for row in results]
-    total_vals = [float(row["total_mean_ms"]) for row in results]
-    req_vals = [float(row["request_size_mean_bytes"]) for row in results]
-    server_vals = [float(row["server_mean_ms"]) for row in results]
     encryption_vals = [float(row["encryption_mean_ms"]) for row in results]
+    server_vals = [float(row["server_mean_ms"]) for row in results]
+    total_vals = [float(row["total_mean_ms"]) for row in results]
+    request_vals = [float(row["request_size_mean_bytes"]) for row in results]
 
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    plt.figure()
-    plt.plot(counts, encryption_vals, marker="o", linestyle="-", linewidth=2, markersize=8)
-    plt.xlabel("Количество признаков", fontsize=12)
-    plt.ylabel("Среднее время шифрования, мс", fontsize=12)
-    plt.title("Зависимость времени шифрования от числа признаков", fontsize=14)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(PLOTS_DIR / "feature_count_vs_encryption_time.png", bbox_inches="tight")
-    plt.close()
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.plot(counts, encryption_vals, marker="o", linewidth=2)
+    ax.set_xlabel("Число признаков")
+    ax.set_ylabel("Среднее время шифрования, мс")
+    ax.set_title("Зависимость времени шифрования от числа признаков")
+    ax.set_xticks(counts)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(PLOTS_DIR / "feature_count_vs_encryption_time.png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
 
-    plt.figure()
-    plt.plot(counts, total_vals, marker="o")
-    plt.xlabel("Feature count (k)")
-    plt.ylabel("Total time (ms)")
-    plt.title("Feature count vs total time")
-    plt.grid(True, alpha=0.3)
-    plt.savefig(PLOTS_DIR / "feature_count_vs_total_time.png", bbox_inches="tight")
-    plt.close()
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.plot(counts, total_vals, marker="o", linewidth=2)
+    ax.set_xlabel("Число признаков")
+    ax.set_ylabel("Общее время, мс")
+    ax.set_title("Зависимость общего времени от числа признаков")
+    ax.set_xticks(counts)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(PLOTS_DIR / "feature_count_vs_total_time.png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
 
-    plt.figure()
-    plt.plot(counts, req_vals, marker="o")
-    plt.xlabel("Feature count (k)")
-    plt.ylabel("Encrypted request size (bytes)")
-    plt.title("Feature count vs request size")
-    plt.grid(True, alpha=0.3)
-    plt.savefig(PLOTS_DIR / "feature_count_vs_request_size.png", bbox_inches="tight")
-    plt.close()
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.plot(counts, request_vals, marker="o", linewidth=2)
+    ax.set_xlabel("Число признаков")
+    ax.set_ylabel("Размер зашифрованного запроса, байт")
+    ax.set_title("Зависимость размера запроса от числа признаков")
+    ax.set_xticks(counts)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(PLOTS_DIR / "feature_count_vs_request_size.png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
 
-    plt.figure()
-    plt.plot(counts, server_vals, marker="o")
-    plt.xlabel("Feature count (k)")
-    plt.ylabel("Server compute time (ms)")
-    plt.title("Feature count vs server time")
-    plt.grid(True, alpha=0.3)
-    plt.savefig(PLOTS_DIR / "feature_count_vs_server_time.png", bbox_inches="tight")
-    plt.close()
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.plot(counts, server_vals, marker="o", linewidth=2)
+    ax.set_xlabel("Число признаков")
+    ax.set_ylabel("Время серверного вычисления, мс")
+    ax.set_title("Зависимость времени серверного вычисления от числа признаков")
+    ax.set_xticks(counts)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(PLOTS_DIR / "feature_count_vs_server_time.png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
 
-    logger.info("Saved feature scaling metrics to %s", CSV_PATH)
-    logger.info("Saved plots to %s", PLOTS_DIR)
-    logger.info("Feature scaling benchmark completed.")
+    logger.info("Метрики сохранены в %s", CSV_PATH)
+    logger.info("Графики сохранены в %s", PLOTS_DIR)
+    logger.info("Эксперимент по влиянию числа признаков завершён.")
 
 
 if __name__ == "__main__":
