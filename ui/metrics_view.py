@@ -314,9 +314,14 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
 
     with f_col, st.container(border=True):
         st.subheader("Влияние защиты")
-        st.write(f"Обычный прогноз: **{_format_number(baseline_number, 6)}**")
-        st.write(f"Защищённый прогноз: **{_format_number(secure_number, 6)}**")
-        st.write(f"Отклонение Δ: **{_format_number(delta_secure_baseline, 6)}**")
+        if scenario_id == "classification":
+            st.write(f"Вероятность без защиты: **{_format_number(baseline_number, 6)}**")
+            st.write(f"Вероятность в защищённом режиме: **{_format_number(secure_number, 6)}**")
+            st.write(f"Отклонение вероятности: **{_format_number(delta_secure_baseline, 6)}**")
+        else:
+            st.write(f"Обычный прогноз: **{_format_number(baseline_number, 6)}**")
+            st.write(f"Защищённый прогноз: **{_format_number(secure_number, 6)}**")
+            st.write(f"Отклонение прогноза: **{_format_number(delta_secure_baseline, 6)}**")
         render_status_banner(
             f"✓ Отклонение {_format_number(delta_secure_baseline, 6)} меньше допуска {_format_number(tolerance, 2)}"
             if fidelity_color == "green"
@@ -324,11 +329,28 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
             fidelity_color,
         )
         with st.expander("Подробности сравнения режимов", expanded=False):
-            st.write(f"Расчёт после кодирования: {_format_number(encoded_number, 6)}")
-            st.write(
-                f"Δ кодирование относительно обычного: {_format_number(delta_encoded_baseline, 6)}"
-            )
-            st.write(f"Δ PHE относительно кодирования: {_format_number(delta_secure_encoded, 6)}")
+            if scenario_id == "classification":
+                encoded_class = result.get("pred_encoded")
+                encoded_class_text = str(int(encoded_class)) if encoded_class is not None else "—"
+                st.write(
+                    f"Линейный результат после кодирования z: {_format_number(encoded_value, 6)}"
+                )
+                st.write(f"Вероятность после кодирования: {_format_number(encoded_number, 6)}")
+                st.write(f"Класс после кодирования: {encoded_class_text}")
+                st.write(
+                    f"Δ вероятность после кодирования относительно режима без защиты: {_format_number(delta_encoded_baseline, 6)}"
+                )
+                st.write(
+                    f"Δ защищённая вероятность относительно кодирования: {_format_number(delta_secure_encoded, 6)}"
+                )
+            else:
+                st.write(f"Расчёт после кодирования: {_format_number(encoded_number, 6)}")
+                st.write(
+                    f"Δ кодирование относительно обычного: {_format_number(delta_encoded_baseline, 6)}"
+                )
+                st.write(
+                    f"Δ PHE относительно кодирования: {_format_number(delta_secure_encoded, 6)}"
+                )
             st.write(f"Запас до допуска: {_format_number(margin, 6)}")
 
     with p_col, st.container(border=True):
@@ -350,11 +372,18 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
             st.write(f"Полное время запроса: {_format_ms(result.get('http_elapsed_ms'))}")
 
     if delta_secure_baseline is not None:
-        message = (
-            f"Защищённый режим воспроизводит результат базовой модели в пределах установленного допуска. "
-            f"Отклонение PHE от обычного прогноза: {_format_number(delta_secure_baseline, 6)}. "
-            "Если ошибка велика, она относится к исходной ML-модели, а не к криптографическому преобразованию."
-        )
+        if scenario_id == "classification":
+            message = (
+                "Защищённый режим воспроизводит вероятность базовой модели в пределах установленного допуска. "
+                f"Отклонение PHE от вероятности без защиты: {_format_number(delta_secure_baseline, 6)}. "
+                "Если класс выбран неверно, это относится к исходной ML-модели, а не к криптографическому преобразованию."
+            )
+        else:
+            message = (
+                "Защищённый режим воспроизводит результат базовой модели в пределах установленного допуска. "
+                f"Отклонение PHE от обычного прогноза: {_format_number(delta_secure_baseline, 6)}. "
+                "Если ошибка велика, она относится к исходной ML-модели, а не к криптографическому преобразованию."
+            )
         if fidelity_color == "green":
             st.success(message)
         elif fidelity_color == "yellow":
