@@ -120,40 +120,77 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     )
 
     scenarios = resources["scenarios"]
-    scenario_id = st.radio(
-        "Тип задачи",
-        options=list(scenarios.keys()),
-        format_func=lambda sid: scenarios[sid]["title"],
-        horizontal=True,
-    )
-    scenario = scenarios[scenario_id]
-    x_test = scenario["x_test"]
-    y_test = scenario["y_test"]
-    model = scenario["model"]
+    scenario_options = list(scenarios.keys())
 
-    sample_idx = st.slider("Шаг 0. Выберите индекс тестового образца", 0, len(x_test) - 1, 0)
+    def reset_demo_state(next_scenario_id: str, next_sample_idx: int) -> None:
+        """Clear all protocol data and return the wizard to its idle state."""
+        st.session_state.demo_state = ProtocolState(
+            scenario_id=next_scenario_id,
+            sample_idx=next_sample_idx,
+        ).to_session_dict()
+        st.session_state.pop("protocol_trace", None)
+        st.session_state.pop("protocol_result", None)
+
+    top_panel = st.container(border=True)
+    with top_panel:
+        scenario_col, sample_col, object_col = st.columns([2, 3, 2])
+        with scenario_col:
+            scenario_id = st.radio(
+                "Тип задачи",
+                options=scenario_options,
+                format_func=lambda sid: scenarios[sid]["title"],
+                horizontal=True,
+                key="scenario_id_control",
+            )
+        scenario = scenarios[scenario_id]
+        x_test = scenario["x_test"]
+        y_test = scenario["y_test"]
+        model = scenario["model"]
+
+        with sample_col:
+            sample_idx = st.slider(
+                "Тестовый объект",
+                min_value=0,
+                max_value=len(x_test) - 1,
+                value=0,
+                key=f"sample_idx_control_{scenario_id}",
+            )
+        with object_col:
+            st.markdown("&nbsp;", unsafe_allow_html=True)
+            st.write(f"Объект {sample_idx} из {len(x_test)}")
+
+        st.session_state.setdefault(
+            "demo_state",
+            ProtocolState(scenario_id=scenario_id, sample_idx=sample_idx).to_session_dict(),
+        )
+        if (
+            st.session_state.demo_state["scenario_id"] != scenario_id
+            or st.session_state.demo_state.get("sample_idx") != sample_idx
+        ):
+            reset_demo_state(scenario_id, sample_idx)
+
+        wizard_state: dict[str, Any] = st.session_state.demo_state
+        result: dict[str, Any] = wizard_state["result"]
+        current_step = int(wizard_state["step"])
+
+        controls = st.columns(5)
+        with controls[0]:
+            start_clicked = st.button("Запустить демонстрацию", disabled=current_step != 0)
+        with controls[1]:
+            next_clicked = st.button("Следующий шаг", disabled=current_step >= 7)
+        with controls[2]:
+            finish_clicked = st.button("Выполнить до конца", disabled=current_step >= 7)
+        with controls[3]:
+            restart_clicked = st.button("Начать заново")
+        with controls[4]:
+            st.markdown("&nbsp;", unsafe_allow_html=True)
+            step_status_placeholder = st.empty()
+            step_status_placeholder.write(f"Шаг {current_step} из 7")
+
     sample = x_test.iloc[sample_idx]
 
-    st.session_state.setdefault(
-        "demo_state",
-        ProtocolState(scenario_id=scenario_id, sample_idx=sample_idx).to_session_dict(),
-    )
-    if (
-        st.session_state.demo_state["scenario_id"] != scenario_id
-        or st.session_state.demo_state.get("sample_idx") != sample_idx
-    ):
-        st.session_state.demo_state = ProtocolState(
-            scenario_id=scenario_id, sample_idx=sample_idx
-        ).to_session_dict()
-
-    wizard_state: dict[str, Any] = st.session_state.demo_state
-    result: dict[str, Any] = wizard_state["result"]
-    current_step = int(wizard_state["step"])
-
     def reset_demo() -> None:
-        st.session_state.demo_state = ProtocolState(
-            scenario_id=scenario_id, sample_idx=sample_idx
-        ).to_session_dict()
+        reset_demo_state(scenario_id, sample_idx)
 
     def execute_next_step() -> bool:
         """Execute exactly one pending operation and advance the demo state by at most one."""
@@ -347,16 +384,6 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
 
         return True
 
-    controls = st.columns(4)
-    with controls[0]:
-        start_clicked = st.button("Запустить демонстрацию", disabled=current_step != 0)
-    with controls[1]:
-        next_clicked = st.button("Следующий шаг", disabled=current_step >= 7)
-    with controls[2]:
-        finish_clicked = st.button("Выполнить до конца", disabled=current_step >= 7)
-    with controls[3]:
-        restart_clicked = st.button("Начать заново")
-
     if restart_clicked:
         reset_demo()
         st.rerun()
@@ -369,7 +396,7 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
         st.rerun()
 
     current_step = int(wizard_state["step"])
-    st.subheader(f"Шаг {current_step} из 7")
+    step_status_placeholder.write(f"Шаг {current_step} из 7")
 
     step1_col, step1_note = st.columns([3, 2])
     with step1_col:
