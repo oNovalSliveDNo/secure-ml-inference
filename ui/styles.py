@@ -28,10 +28,12 @@ LOCAL_CSS = f"""
 .protocol-badge {{ display: inline-block; padding: .15rem .5rem; border-radius: 999px; color: white; font-size: .72rem; font-weight: 700; margin-bottom: .25rem; }}
 .protocol-arrow {{ text-align: center; font-size: 1.6rem; line-height: 1; color: {PALETTE["transport"]}; padding-top: 1.5rem; }}
 .progress-row {{ display:flex; align-items:center; gap:.35rem; margin:.4rem 0 .2rem; }}
-.progress-line {{ flex: .35; height: 1px; background: {PALETTE["border"]}; }}
+.progress-line {{ flex: .35; height: 2px; background: #94a3b8; }}
 .progress-step {{ display:flex; flex-direction:column; align-items:center; gap:.15rem; min-width:5.5rem; }}
 .progress-step span {{ display:grid; place-items:center; width:1.45rem; height:1.45rem; border-radius:50%; background:#e2e8f0; color:#475569; font-weight:800; font-size:.78rem; }}
-.progress-step small {{ font-size:.72rem; color:#334155; text-align:center; }}
+.progress-step small {{ font-size:.8rem; color:#334155; text-align:center; }}
+.progress-step.active small {{ font-weight:700; }}
+.current-step-badge {{ display:inline-block; margin:.35rem 0 .2rem; padding:.35rem .6rem; border:1px solid #bfdbfe; border-radius:.6rem; background:#eff6ff; color:{PALETTE["text"]}; font-size:.88rem; }}
 .progress-step.done span {{ background:{PALETTE["server"]}; color:white; }}
 .progress-step.active span {{ background:{PALETTE["blue"]}; color:white; box-shadow:0 0 0 3px #dbeafe; }}
 div[data-testid="stVerticalBlockBorderWrapper"]:has(div[data-testid="stVerticalBlock"][data-st-key="client_zone"]) {{ background:{PALETTE["client_bg"]}; border-color:{PALETTE["client"]}; }}

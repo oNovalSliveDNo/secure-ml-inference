@@ -50,8 +50,9 @@ def render_arrow(label: str = "→") -> None:
 
 def render_step_statuses(steps: Iterable[str], current_step: int) -> None:
     """Render compact horizontal statuses for all protocol steps."""
+    step_titles = list(steps)
     items: list[str] = []
-    for idx, title in enumerate(steps, start=1):
+    for idx, title in enumerate(step_titles, start=1):
         if current_step > idx:
             cls, mark = "done", "✓"
         elif current_step == idx:
@@ -65,10 +66,15 @@ def render_step_statuses(steps: Iterable[str], current_step: int) -> None:
         f"<div class='progress-row'>{'<div class=progress-line></div>'.join(items)}</div>",
         unsafe_allow_html=True,
     )
-    current_title = (
-        list(steps)[max(min(current_step, 7), 1) - 1] if current_step else "ожидание запуска"
+    current_index = max(min(current_step, 7), 1) - 1
+    current_title = step_titles[current_index] if current_step else "ожидание запуска"
+    st.markdown(
+        "<div class='current-step-badge'>"
+        f"Шаг {current_step if current_step else 0} из 7 — "
+        f"<strong>{html.escape(current_title)}</strong>"
+        "</div>",
+        unsafe_allow_html=True,
     )
-    st.caption(f"Текущий этап: {current_step if current_step else 0} из 7 — {current_title}")
 
 
 _STATUS_TEXT: dict[str, str] = {
