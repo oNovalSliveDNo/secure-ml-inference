@@ -26,6 +26,8 @@ from ui.metrics_helpers import (
     classify_sample_error_status,
     format_class_label,
 )
+from ui.model_labels import get_model_label
+
 
 
 def _to_float(value: Any) -> float | None:
@@ -514,7 +516,7 @@ def render_aggregate_regression_metrics() -> None:
     """Render aggregate regression quality/fidelity panel for the full test set."""
     st.subheader("Результаты регрессии по всей выборке")
     st.info(
-        "Абсолютное качество определяется базовой Ridge-моделью. "
+        f"Абсолютное качество определяется базовой моделью: {get_model_label('regression')}. "
         "Защищённый режим практически не изменяет её агрегированные метрики."
     )
     try:

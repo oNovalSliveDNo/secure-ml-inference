@@ -13,6 +13,7 @@ from app.config import KEY_LENGTH
 from app.crypto import serialize_ciphertext
 from ui.components import render_arrow, render_card, render_compact_kpi, render_operation_card
 from ui.metrics_helpers import format_class_label
+from ui.model_labels import get_model_label, get_model_technical_name
 from ui.styles import PALETTE
 
 FEATURE_LABELS: dict[str, str] = {
@@ -336,7 +337,8 @@ def render_protocol_exchange_layout(
         st.markdown("**СЕРВЕР**")
         st.caption("Владелец модели")
         st.write(f"Сценарий: {'классификация' if scenario_id == 'classification' else 'регрессия'}")
-        st.write(f"Модель: {'LogisticRegression' if scenario_id == 'classification' else 'Ridge'}")
+        st.write(f"Модель: {get_model_label(scenario_id)}")
+        st.caption(get_model_technical_name(scenario_id))
         st.write(f"Коэффициентов: {server_data['coefficient_count']}")
         st.write(f"Масштаб кодирования: {scale:,}".replace(",", " "))
         if current_step >= 4:
