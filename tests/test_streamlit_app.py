@@ -45,13 +45,12 @@ def test_sample_index_change_resets_protocol_state() -> None:
     app.slider[0].set_value(1).run()
 
     assert not app.exception
-    assert (
-        app.session_state["demo_state"]
-        == ProtocolState(
-            scenario_id="classification",
-            sample_idx=1,
-        ).to_session_dict()
-    )
+    expected = ProtocolState(
+        scenario_id="classification",
+        sample_idx=1,
+    ).to_session_dict()
+    expected["result"]["human_sample_idx"] = 2
+    assert app.session_state["demo_state"] == expected
     assert "protocol_trace" not in app.session_state
     assert "protocol_result" not in app.session_state
 
@@ -68,12 +67,11 @@ def test_scenario_change_resets_protocol_state() -> None:
     app.radio[0].set_value("regression").run()
 
     assert not app.exception
-    assert (
-        app.session_state["demo_state"]
-        == ProtocolState(
-            scenario_id="regression",
-            sample_idx=0,
-        ).to_session_dict()
-    )
+    expected = ProtocolState(
+        scenario_id="regression",
+        sample_idx=0,
+    ).to_session_dict()
+    expected["result"]["human_sample_idx"] = 1
+    assert app.session_state["demo_state"] == expected
     assert "protocol_trace" not in app.session_state
     assert "protocol_result" not in app.session_state

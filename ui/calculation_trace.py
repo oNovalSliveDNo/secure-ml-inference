@@ -79,113 +79,127 @@ def render_calculation_trace(
     scale_squared = scale * scale
 
     st.subheader("Математическая трассировка расчёта")
-
-    st.markdown("### 1. Масштабирование")
-    st.latex(r"x_i' = \frac{x_i - \mu_i}{\sigma_i}")
-    st.dataframe(
-        pd.DataFrame(
-            {
-                "Признак": feature_names,
-                "x_i": x_raw,
-                "μ_i": means,
-                "σ_i": sigmas,
-                "(x_i - μ_i) / σ_i": (x_raw - means) / sigmas,
-                "x_scaled": x_scaled,
-            }
-        ),
-        width="stretch",
-    )
-    st.markdown("### 2. Fixed-point кодирование")
-    st.latex(r"x_i^{int} = round(x_i' \cdot S)")
-    st.latex(r"w_i^{int} = round(w_i \cdot S)")
-    st.latex(r"b^{int} = round(b \cdot S^2)")
-    scaled_times_s = x_scaled * scale
-    st.dataframe(
-        pd.DataFrame(
-            {
-                "Признак": feature_names,
-                "x_scaled": x_scaled,
-                "S": scale,
-                "x_scaled × S": scaled_times_s,
-                "x_int": x_int,
-                "ошибка округления": x_int - scaled_times_s,
-            }
-        ),
-        width="stretch",
-    )
-    st.dataframe(
-        pd.DataFrame(
-            [
-                {"Величина": "S", "Значение": scale},
-                {"Величина": "S²", "Значение": scale_squared},
-                {"Величина": "b", "Значение": bias},
-                {"Величина": "b_int", "Значение": b_int},
-            ]
-        ),
-        width="stretch",
+    tabs = st.tabs(
+        [
+            "Масштабирование",
+            "Кодирование",
+            "Шифрование",
+            "Вычисление на сервере",
+            "Расшифрование",
+            "Контрольная проверка",
+        ]
     )
 
-    if "enc_x" in result:
-        st.markdown("### 3. Шифрование")
-        st.latex(r"c_i = Enc_{pk}(x_i^{int})")
-        ciphertext_texts = [_ciphertext_to_text(value) for value in result["enc_x"]]
+    with tabs[0]:
+        st.latex(r"x_i' = \frac{x_i - \mu_i}{\sigma_i}")
         st.dataframe(
             pd.DataFrame(
                 {
                     "Признак": feature_names,
-                    "x_int": x_int,
-                    "ciphertext preview": [_preview(value) for value in ciphertext_texts],
-                    "размер ciphertext в байтах": [
-                        len(value.encode("utf-8")) for value in ciphertext_texts
-                    ],
+                    "Исходное значение": x_raw,
+                    "Среднее μ": means,
+                    "Масштаб σ": sigmas,
+                    "Масштабированное значение": x_scaled,
                 }
             ),
             width="stretch",
         )
-        with st.expander("Полные криптографические значения", expanded=False):
-            st.warning(
-                "Private key не выводится. Ниже показаны только ciphertext и public-key preview."
-            )
-            public_key = getattr(result.get("client"), "public_key", None)
-            if public_key is not None:
-                st.code(f"public_key.n = {_preview(public_key.n, width=96)}")
-            for feature, ciphertext in zip(feature_names, ciphertext_texts, strict=True):
-                st.text_area(str(feature), ciphertext, height=80)
 
-    if "enc_x" in result:
-        st.markdown("### 4. Серверное вычисление")
-        st.latex(r"Enc(z_{int}) = Enc(b_{int}) + \sum_i w_i^{int} \cdot Enc(x_i^{int})")
-        st.warning(
-            "Сервер получает только ciphertext и веса модели; plaintext `x_int` в этом разделе не раскрывается."
-        )
+    with tabs[1]:
+        st.latex(r"x_i^{int} = round(x_i' \cdot S)")
+        st.latex(r"w_i^{int} = round(w_i \cdot S)")
+        st.latex(r"b^{int} = round(b \cdot S^2)")
+        scaled_times_s = x_scaled * scale
         st.dataframe(
             pd.DataFrame(
                 {
-                    "ciphertext preview": [_preview(value) for value in ciphertext_texts],
-                    "w_int": w_int,
-                    "operation description": [
-                        f"add w_int[{i}] × Enc(x_int[{i}]) to encrypted accumulator"
-                        for i in range(len(w_int))
-                    ],
-                    "status": "homomorphic term added",
+                    "Признак": feature_names,
+                    "Масштабированное значение": x_scaled,
+                    "S": scale,
+                    "x' × S": scaled_times_s,
+                    "Целое значение": x_int,
+                    "Ошибка округления": x_int - scaled_times_s,
                 }
             ),
             width="stretch",
         )
-
-    if "score_int" in result:
-        st.markdown("### 5. Расшифрование и декодирование")
-        z_int = int(result["score_int"])
-        decoded_z = decode_score(z_int, scale)
-        st.latex(r"z_{int} = Dec_{sk}(Enc(z_{int}))")
-        st.latex(r"z = \frac{z_{int}}{S^2}")
-        st.write(
-            f"Подстановка: z_int = {z_int}; S² = {scale_squared}; z = {z_int} / {scale_squared} = {decoded_z:.12g}"
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {"Величина": "S", "Значение": scale},
+                    {"Величина": "S²", "Значение": scale_squared},
+                    {"Величина": "Свободный член b", "Значение": bias},
+                    {"Величина": "Закодированный свободный член", "Значение": b_int},
+                ]
+            ),
+            width="stretch",
         )
 
-    with st.expander("Контрольный открытый расчёт для проверки корректности", expanded=False):
+    ciphertext_texts = [_ciphertext_to_text(value) for value in result.get("enc_x", [])]
+    with tabs[2]:
+        st.latex(r"c_i = Enc_{pk}(x_i^{int})")
+        if ciphertext_texts:
+            st.dataframe(
+                pd.DataFrame(
+                    {
+                        "Признак": feature_names,
+                        "Целое значение": x_int,
+                        "Зашифрованное значение": [_preview(value) for value in ciphertext_texts],
+                        "Размер шифротекста, байт": [
+                            len(value.encode("utf-8")) for value in ciphertext_texts
+                        ],
+                    }
+                ),
+                width="stretch",
+            )
+            with st.expander("Полные криптографические значения", expanded=False):
+                st.warning(
+                    "Закрытый ключ не выводится. Ниже показаны только шифротексты и открытый ключ."
+                )
+                public_key = getattr(result.get("client"), "public_key", None)
+                if public_key is not None:
+                    st.code(f"Открытый ключ n = {_preview(public_key.n, width=96)}")
+                for feature, ciphertext in zip(feature_names, ciphertext_texts, strict=True):
+                    st.text_area(str(feature), ciphertext, height=80)
+        else:
+            st.info("Шифротексты появятся после шага шифрования.")
+
+    with tabs[3]:
+        st.latex(r"Enc(z_{int}) = Enc(b_{int}) + \sum_i w_i^{int} \cdot Enc(x_i^{int})")
         st.warning(
-            "Этот блок нужен только для аудита корректности в UI. Сервер не получает открытые `x_int`."
+            "Сервер получает только шифротексты и веса модели; открытые признаки здесь приведены только для аудита UI."
+        )
+        if ciphertext_texts:
+            st.dataframe(
+                pd.DataFrame(
+                    {
+                        "Зашифрованное значение": [_preview(value) for value in ciphertext_texts],
+                        "Закодированный вес": w_int,
+                        "Операция": [
+                            f"прибавить w_int[{i}] × Enc(x_int[{i}]) к аккумулятору"
+                            for i in range(len(w_int))
+                        ],
+                        "Статус": "гомоморфный член добавлен",
+                    }
+                ),
+                width="stretch",
+            )
+
+    with tabs[4]:
+        if "score_int" in result:
+            z_int = int(result["score_int"])
+            decoded_z = decode_score(z_int, scale)
+            st.latex(r"z_{int} = Dec_{sk}(Enc(z_{int}))")
+            st.latex(r"z = \frac{z_{int}}{S^2}")
+            st.write(
+                f"Подстановка: z_int = {z_int}; S² = {scale_squared}; z = {z_int} / {scale_squared} = {decoded_z:.12g}"
+            )
+        else:
+            st.info("Расшифрованное значение появится после шага расшифрования.")
+
+    with tabs[5]:
+        st.warning(
+            "Контрольный открытый расчёт нужен только для проверки корректности. Сервер не получает открытые x_int."
         )
         products = x_int * w_int
         control_z_int = int(np.sum(products) + b_int)
@@ -194,9 +208,9 @@ def render_calculation_trace(
             pd.DataFrame(
                 {
                     "Признак": feature_names,
-                    "x_int": x_int,
-                    "w_int": w_int,
-                    "product x_int × w_int": products,
+                    "Целое значение": x_int,
+                    "Закодированный вес": w_int,
+                    "Произведение": products,
                 }
             ),
             width="stretch",
@@ -205,13 +219,13 @@ def render_calculation_trace(
         st.dataframe(
             pd.DataFrame(
                 [
-                    {"Величина": "sum(products)", "Значение": int(np.sum(products))},
-                    {"Величина": "b_int", "Значение": b_int},
-                    {"Величина": "final z_int", "Значение": control_z_int},
-                    {"Величина": "decoded z", "Значение": control_z},
-                    {"Величина": "decrypted PHE z_int", "Значение": decrypted_score_int},
+                    {"Величина": "Сумма произведений", "Значение": int(np.sum(products))},
+                    {"Величина": "Закодированный свободный член", "Значение": b_int},
+                    {"Величина": "Итоговое целое значение", "Значение": control_z_int},
+                    {"Величина": "Итоговый прогноз", "Значение": control_z},
+                    {"Величина": "Расшифрованное PHE-значение", "Значение": decrypted_score_int},
                     {
-                        "Величина": "equality with decrypted PHE score",
+                        "Величина": "Совпадает с расшифрованным результатом",
                         "Значение": decrypted_score_int == control_z_int,
                     },
                 ]

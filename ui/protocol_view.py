@@ -2,54 +2,57 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
-from ui.components import render_arrow, render_badge, render_card, render_side_header
+from app.config import KEY_LENGTH
+from ui.components import render_arrow, render_card, render_compact_kpi, render_operation_card
 from ui.styles import PALETTE
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 def _preview(value: Any, chars: int = 48) -> str:
-    """Return a compact, safe text preview for long protocol values."""
     text = str(value)
     return text if len(text) <= chars else f"{text[:chars]}..."
 
 
-def _render_badges(labels: Sequence[tuple[str, str]]) -> None:
-    """Render a row-like set of protocol badges."""
-    for label, color in labels:
-        render_badge(label, color)
+def _fmt(value: Any, digits: int = 2) -> str:
+    try:
+        return f"{float(value):.{digits}f}".replace(".", ",")
+    except (TypeError, ValueError):
+        return "—"
 
 
-def _show_if_present(label: str, value: Any, *, code: bool = False) -> None:
-    """Show a labeled value only when it is available in the protocol state."""
-    if value is None:
-        return
-    st.caption(label)
-    if code:
-        st.code(value)
-    else:
-        st.write(value)
-
-
-def _scaler_parameters(scaler: Any, feature_names: Sequence[str]) -> pd.DataFrame | None:
-    """Build a compact table with scaler parameters when they are available."""
-    mean = getattr(scaler, "mean_", None)
-    scale = getattr(scaler, "scale_", None)
-    if mean is None or scale is None:
+def _feature_example(
+    sample: pd.Series, scenario: dict[str, Any], result: dict[str, Any]
+) -> tuple[str, str, str, str, str] | None:
+    scaler = scenario.get("scaler")
+    if scaler is None or not all(hasattr(scaler, attr) for attr in ("mean_", "scale_")):
         return None
-    return pd.DataFrame(
-        {
-            "Признак": feature_names,
-            "mean": mean,
-            "scale": scale,
-        }
+    idx = 0
+    name = str(sample.index[idx])
+    raw = float(sample.iloc[idx])
+    mean = float(scaler.mean_[idx])
+    sigma = float(scaler.scale_[idx])
+    scaled = float(result.get("x_scaled", np.array([(raw - mean) / sigma]))[idx])
+    return name, _fmt(raw), _fmt(mean), _fmt(sigma), _fmt(scaled)
+
+
+def _active(step: int, zone: str) -> bool:
+    return (
+        (zone == "client" and step in {1, 2, 3, 6})
+        or (zone == "channel" and step in {4, 5})
+        or (zone == "server" and step == 5)
     )
+
+
+def _active_note(step: int, zone: str) -> None:
+    if _active(step, zone):
+        st.markdown(
+            "<div class='active-zone'>Сейчас выполняется здесь</div>", unsafe_allow_html=True
+        )
 
 
 def build_server_panel_data(
@@ -62,7 +65,7 @@ def build_server_panel_data(
 ) -> dict[str, Any]:
     """Prepare only server-visible protocol data for the server panel."""
     request_payload = dict(result.get("request_payload", {}))
-    feature_count = request_payload.get("feature_count", len(sample))
+    feature_count = int(request_payload.get("feature_count", len(sample)))
     encrypted_features = request_payload.get("encrypted_features", [])
     encrypted_score = result.get("encrypted_score")
     return {
@@ -73,7 +76,7 @@ def build_server_panel_data(
         "encrypted_feature_previews": [_preview(value, 36) for value in encrypted_features[:5]],
         "feature_count": feature_count,
         "multiplication_count": feature_count,
-        "addition_count": max(feature_count - 1, 0),
+        "addition_count": feature_count,
         "encrypted_score_preview": None
         if encrypted_score is None
         else _preview(encrypted_score, 80),
@@ -89,119 +92,146 @@ def render_protocol_exchange_layout(
     current_step: int,
     scale: int,
     scenario_id: str | None = None,
+    detailed: bool = False,
 ) -> None:
-    """Render client, transport, and server-visible protocol data in three columns."""
-    client_col, transport_col, server_col = st.columns([5, 1, 5])
+    """Render compact client, channel, and server protocol zones."""
+    client_col, channel_col, server_col = st.columns([4.7, 1.2, 4.7])
     feature_names = [str(name) for name in sample.index]
 
-    with client_col:
-        render_side_header("КЛИЕНТ", "Владелец данных и закрытого ключа", PALETTE["client"])
-        _render_badges(
-            [
-                ("открыто на клиенте", PALETTE["client"]),
-                ("зашифровано", PALETTE["transport"]),
-                ("не отправляется", PALETTE["warning"]),
-                ("секрет клиента", PALETTE["warning"]),
-            ]
-        )
-        st.markdown("**Исходные признаки**")
-        st.dataframe(
-            pd.DataFrame({"Признак": feature_names, "Значение": sample.values}), width="stretch"
-        )
+    server_data = build_server_panel_data(
+        result=result, scenario=scenario, sample=sample, scale=scale, scenario_id=scenario_id
+    )
 
-        scaler_df = _scaler_parameters(scenario.get("scaler"), feature_names)
-        if scaler_df is not None:
-            st.markdown("**Scaler параметры**")
-            st.dataframe(scaler_df, width="stretch")
-        if "x_scaled" in result:
-            st.markdown("**Scaled features**")
-            st.dataframe(
-                pd.DataFrame({"Признак": feature_names, "x_scaled": result["x_scaled"]}),
-                width="stretch",
+    with client_col, st.container(key="client_zone", border=True):
+        _active_note(current_step, "client")
+        st.markdown("**КЛИЕНТ**  ")
+        st.caption("Владелец данных и закрытого ключа")
+        render_compact_kpi("Выбран объект", str(result.get("human_sample_idx", "—")))
+        render_compact_kpi("Количество признаков", str(len(sample)))
+        st.write("✓ Исходные данные локальны  ")
+        st.write("✓ Закрытый ключ не передаётся")
+        ex = _feature_example(sample, scenario, result)
+        if current_step >= 1 and ex:
+            name, raw, mean, sigma, scaled = ex
+            render_operation_card(
+                "Масштабирование признаков",
+                "x' = (x − μ) / σ",
+                f"{name}: ({raw} − {mean}) / {sigma} = {scaled}",
             )
-        if "x_int" in result:
-            st.markdown("**Fixed-point encoding**")
-            st.dataframe(
-                pd.DataFrame({"Признак": feature_names, "x_int": result["x_int"]}),
-                width="stretch",
+            st.write(f"Обработано признаков: {len(sample)}")
+            with st.expander(
+                "Показать все исходные и масштабированные признаки", expanded=detailed
+            ):
+                scaler = scenario["scaler"]
+                st.dataframe(
+                    pd.DataFrame(
+                        {
+                            "Признак": feature_names,
+                            "Исходное значение": sample.values,
+                            "Среднее μ": scaler.mean_,
+                            "Масштаб σ": scaler.scale_,
+                            "Масштабированное значение": result.get("x_scaled", []),
+                        }
+                    ),
+                    width="stretch",
+                )
+        if current_step >= 2 and "x_int" in result:
+            value = int(result["x_int"][0])
+            scaled_value = float(result["x_scaled"][0])
+            render_operation_card(
+                "Кодирование с фиксированной точкой",
+                "x_int = round(x' × S)",
+                f"{_fmt(scaled_value)} × {scale:,} → {value}".replace(",", " "),
             )
-        client = result.get("client")
-        if client is not None:
-            _show_if_present(
-                "Public key preview", f"n = {_preview(client.public_key.n)}", code=True
-            )
-            _show_if_present("Private key", "есть у клиента; значение не отображается")
-        if "enc_x" in result:
-            st.markdown("**Ciphertext previews**")
-            st.dataframe(
-                pd.DataFrame(
-                    {
-                        "Признак": feature_names,
-                        "Enc(x)": [_preview(value, 36) for value in result["enc_x"]],
-                    }
-                ),
-                width="stretch",
-            )
-        encrypted_score = result.get("encrypted_score")
-        _show_if_present(
-            "Encrypted result",
-            None if encrypted_score is None else _preview(encrypted_score, 80),
-            code=True,
-        )
-        _show_if_present("Decrypted integer", result.get("score_int"))
-        _show_if_present("Decoded prediction", result.get("z_secure"))
-        _show_if_present("Postprocessing", scenario.get("postprocess"))
+            st.write(f"Масштаб S: {scale:,}".replace(",", " "))
+            st.write(f"Закодировано значений: {len(result['x_int'])}")
+            with st.expander("Все закодированные значения", expanded=detailed):
+                st.dataframe(
+                    pd.DataFrame(
+                        {
+                            "Признак": feature_names,
+                            "Масштабированное значение": result["x_scaled"],
+                            "Целое значение": result["x_int"],
+                        }
+                    ),
+                    width="stretch",
+                )
+        if current_step >= 3 and "enc_x" in result:
+            render_operation_card("Шифрование Paillier", "c_i = Enc_pk(x_int)")
+            st.write(f"Длина ключа: {KEY_LENGTH} бит")
+            st.write(f"Зашифровано признаков: {len(result['enc_x'])}")
+            st.write("Закрытый ключ остаётся у клиента")
+            st.code(_preview(result["enc_x"][0], 64))
+            with st.expander("Зашифрованные признаки и открытый ключ", expanded=detailed):
+                client = result.get("client")
+                if client is not None:
+                    st.code(f"Открытый ключ n = {_preview(client.public_key.n, 120)}")
+                st.dataframe(
+                    pd.DataFrame(
+                        {
+                            "Признак": feature_names,
+                            "Зашифрованное значение": [_preview(v, 80) for v in result["enc_x"]],
+                        }
+                    ),
+                    width="stretch",
+                )
+        if current_step >= 6 and "z_secure" in result:
+            render_operation_card("Результат получен и расшифрован", "z = Dec_sk(Enc(z_int)) / S²")
+            st.write(f"Расшифрованное целое значение: `{result['score_int']}`")
+            st.write(f"Итоговый прогноз: `{_fmt(result['z_secure'], 6)}`")
+            if scenario_id == "classification":
+                st.write(f"Вероятность класса: `{_fmt(result.get('prob_secure'), 4)}`")
+                st.write(f"Предсказанный класс: `{result.get('pred_secure', '—')}`")
 
-    with transport_col:
-        if current_step == 4:
-            st.markdown("**Enc(x), public key ─────────>**")
-        elif current_step == 5:
-            st.markdown("**Enc(z) <─────────**")
+    with channel_col, st.container(key="channel_zone", border=True):
+        _active_note(current_step, "channel")
+        st.markdown("**Канал передачи**")
+        if current_step < 4:
+            st.caption("Ожидание")
+        elif current_step == 4:
+            st.markdown(
+                "<div class='channel-arrow'>КЛИЕНТ ─────> СЕРВЕР</div>", unsafe_allow_html=True
+            )
+            st.markdown(
+                f"Передаются:<br>• открытый ключ;<br>• {len(sample)} зашифрованных признаков;<br>• служебные параметры.",
+                unsafe_allow_html=True,
+            )
         else:
-            st.markdown("──────────")
-        if "request_payload" in result:
-            st.metric("Payload size", result.get("encrypted_bytes", "—"))
-            st.metric("Feature count", result["request_payload"].get("feature_count", "—"))
-        else:
-            st.metric("Payload size", "—")
-            st.metric("Feature count", len(sample))
-        st.metric("HTTP status", result.get("status_code", "—"))
-        http_elapsed = result.get("http_elapsed_ms")
-        st.metric("HTTP roundtrip", "—" if http_elapsed is None else f"{http_elapsed:.1f} мс")
-
-    with server_col:
-        render_side_header("СЕРВЕР", "Только данные, доступные серверу", PALETTE["server"])
-        server_data = build_server_panel_data(
-            result=result,
-            scenario=scenario,
-            sample=sample,
-            scale=scale,
-            scenario_id=scenario_id,
-        )
-        st.write(f"Scenario id: `{server_data['scenario_id']}`")
-        st.write(f"Coefficient count: `{server_data['coefficient_count']}`")
-        st.write(f"Scale: `{server_data['scale']}`")
-        st.write("Encoded weights: есть на сервере; значения не раскрываются в клиентском UI")
-        if "request_payload" in result:
-            st.markdown("**Ciphertext feature previews**")
-            st.dataframe(
-                pd.DataFrame({"Enc(x) preview": server_data["encrypted_feature_previews"]}),
-                width="stretch",
+            st.markdown(
+                "<div class='channel-arrow'>КЛИЕНТ <───── СЕРВЕР</div>", unsafe_allow_html=True
             )
-        st.write(
-            "Operation counts: "
-            f"умножений ciphertext×weight = {server_data['multiplication_count']}; "
-            f"сложений = {server_data['addition_count']}"
-        )
-        _show_if_present(
-            "Encrypted bias/result",
-            server_data["encrypted_score_preview"],
-            code=True,
-        )
-        server_compute = server_data["server_compute_ms"]
-        st.metric(
-            "Server compute time", "—" if server_compute is None else f"{server_compute:.1f} мс"
-        )
+            st.write("Возвращается один зашифрованный результат Enc(z)")
+        st.caption(f"Размер запроса: {result.get('encrypted_bytes', '—')} байт")
+        st.caption(f"HTTP: {result.get('status_code', '—')}")
+
+    with server_col, st.container(key="server_zone", border=True):
+        _active_note(current_step, "server")
+        st.markdown("**СЕРВЕР**")
+        st.caption("Владелец модели")
+        st.write(f"Сценарий: {'классификация' if scenario_id == 'classification' else 'регрессия'}")
+        st.write(f"Модель: {'LogisticRegression' if scenario_id == 'classification' else 'Ridge'}")
+        st.write(f"Коэффициентов: {server_data['coefficient_count']}")
+        st.write(f"Масштаб кодирования: {scale:,}".replace(",", " "))
+        if current_step >= 4:
+            st.write(f"Получено зашифрованных признаков: {server_data['feature_count']}")
+            st.write("Открытые значения признаков: недоступны")
+            st.write("Закрытый ключ: недоступен")
+        if current_step >= 5:
+            render_operation_card(
+                "Гомоморфное вычисление", "Enc(z_int) = Enc(b_int) + Σ w_int · Enc(x_int)"
+            )
+            st.write(f"Умножений шифротекста на коэффициент: {server_data['multiplication_count']}")
+            st.write(f"Сложений с аккумулятором: {server_data['addition_count']}")
+            st.write(f"Время вычисления: {_fmt(server_data['server_compute_ms'])} мс")
+            with st.expander("Подробности серверного вычисления", expanded=detailed):
+                st.dataframe(
+                    pd.DataFrame(
+                        {"Зашифрованный признак": server_data["encrypted_feature_previews"]}
+                    ),
+                    width="stretch",
+                )
+                if server_data["encrypted_score_preview"]:
+                    st.code(f"Зашифрованный результат: {server_data['encrypted_score_preview']}")
 
 
 def render_client_transport_server_panels() -> None:
@@ -210,7 +240,7 @@ def render_client_transport_server_panels() -> None:
     with client_col:
         render_card(
             "Клиент",
-            "Масштабирует признаки, кодирует их в целые числа, генерирует ключи, шифрует данные и расшифровывает результат.",
+            "Масштабирует, кодирует, шифрует признаки и расшифровывает результат.",
             "CLIENT",
             PALETTE["client"],
         )
@@ -219,7 +249,7 @@ def render_client_transport_server_panels() -> None:
     with transport_col:
         render_card(
             "Транспорт",
-            "Передаёт открытый ключ, зашифрованные признаки, масштаб кодирования и служебные метаданные запроса.",
+            "Передаёт открытый ключ, зашифрованные признаки и служебные параметры.",
             "HTTPS/API",
             PALETTE["transport"],
         )
@@ -228,7 +258,7 @@ def render_client_transport_server_panels() -> None:
     with server_col:
         render_card(
             "Сервер",
-            "Выполняет линейное вычисление модели над шифротекстами и возвращает зашифрованный score.",
+            "Вычисляет линейную модель над шифротекстами и возвращает Enc(z).",
             "SERVER",
             PALETTE["server"],
         )
@@ -238,44 +268,10 @@ def show_architecture() -> None:
     """Render architecture and threat model without image schemes."""
     st.header("Архитектура и модель угроз")
     render_client_transport_server_panels()
-    st.markdown(
-        """
+    st.markdown("""
 ### Как работает система
-
-1. **Клиент подготавливает данные.** Пользователь выбирает объект из тестовой выборки. На стороне клиента признаки масштабируются, переводятся в целые числа и шифруются.
-2. **Сервер получает только зашифрованные признаки.** Сервер не видит исходные значения признаков. Он получает открытую часть ключа, набор зашифрованных чисел и служебные параметры.
-3. **Сервер выполняет расчёт над зашифрованными данными.** Сервер использует заранее обученную модель и возвращает клиенту зашифрованный результат линейного вычисления.
-4. **Клиент расшифровывает результат.** Закрытый ключ хранится только у клиента. После расшифровки клиент получает итоговое значение.
-
-### Что защищается
-
-- исходные признаки клиента;
-- промежуточный результат расчёта до расшифровки;
-- закрытый ключ, который не покидает сторону клиента.
-
-### Что видит сервер
-
-- открытую часть ключа;
-- зашифрованные признаки;
-- количество признаков;
-- выбранный тип задачи;
-- служебные параметры кодирования.
-
-### Что сервер не видит
-
-- исходные значения признаков;
-- закрытый ключ клиента;
-- расшифрованный результат вычисления.
-
-### Модель угроз
-
-В демонстрации рассматривается сервер, который корректно выполняет протокол, но может пытаться извлечь информацию из полученных данных.
-
-### Ограничения демонстрации
-
-- модель сервера не скрывается от самого сервера;
-- факт обращения к серверу и технические метаданные не защищаются;
-- активные атаки, компрометация клиента и атаки по побочным каналам не рассматриваются;
-- прототип предназначен для демонстрации и экспериментальной оценки, а не для промышленного внедрения без дополнительной защиты.
-        """
-    )
+1. **Клиент подготавливает данные.** Признаки масштабируются, кодируются и шифруются локально.
+2. **Сервер получает только зашифрованные признаки.** Исходные значения и закрытый ключ недоступны серверу.
+3. **Сервер выполняет расчёт над зашифрованными данными.** Используются веса заранее обученной модели.
+4. **Клиент расшифровывает результат.** Итоговый прогноз получает только клиент.
+""")
