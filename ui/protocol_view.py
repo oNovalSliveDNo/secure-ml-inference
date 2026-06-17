@@ -52,6 +52,35 @@ def _scaler_parameters(scaler: Any, feature_names: Sequence[str]) -> pd.DataFram
     )
 
 
+def build_server_panel_data(
+    *,
+    result: dict[str, Any],
+    scenario: dict[str, Any],
+    sample: pd.Series,
+    scale: int,
+    scenario_id: str | None = None,
+) -> dict[str, Any]:
+    """Prepare only server-visible protocol data for the server panel."""
+    request_payload = dict(result.get("request_payload", {}))
+    feature_count = request_payload.get("feature_count", len(sample))
+    encrypted_features = request_payload.get("encrypted_features", [])
+    encrypted_score = result.get("encrypted_score")
+    return {
+        "scenario_id": scenario_id or request_payload.get("scenario_id", "—"),
+        "coefficient_count": len(scenario.get("w", [])),
+        "scale": scale,
+        "request_payload": request_payload,
+        "encrypted_feature_previews": [_preview(value, 36) for value in encrypted_features[:5]],
+        "feature_count": feature_count,
+        "multiplication_count": feature_count,
+        "addition_count": max(feature_count - 1, 0),
+        "encrypted_score_preview": None
+        if encrypted_score is None
+        else _preview(encrypted_score, 80),
+        "server_compute_ms": result.get("server_compute_ms"),
+    }
+
+
 def render_protocol_exchange_layout(
     *,
     result: dict[str, Any],
@@ -142,34 +171,34 @@ def render_protocol_exchange_layout(
 
     with server_col:
         render_side_header("СЕРВЕР", "Только данные, доступные серверу", PALETTE["server"])
-        visible_scenario_id = scenario_id or result.get("request_payload", {}).get(
-            "scenario_id", "—"
+        server_data = build_server_panel_data(
+            result=result,
+            scenario=scenario,
+            sample=sample,
+            scale=scale,
+            scenario_id=scenario_id,
         )
-        st.write(f"Scenario id: `{visible_scenario_id}`")
-        st.write(f"Coefficient count: `{len(scenario.get('w', []))}`")
-        st.write(f"Scale: `{scale}`")
+        st.write(f"Scenario id: `{server_data['scenario_id']}`")
+        st.write(f"Coefficient count: `{server_data['coefficient_count']}`")
+        st.write(f"Scale: `{server_data['scale']}`")
         st.write("Encoded weights: есть на сервере; значения не раскрываются в клиентском UI")
         if "request_payload" in result:
             st.markdown("**Ciphertext feature previews**")
-            encrypted_features = result["request_payload"].get("encrypted_features", [])
             st.dataframe(
-                pd.DataFrame(
-                    {"Enc(x) preview": [_preview(value, 36) for value in encrypted_features[:5]]}
-                ),
+                pd.DataFrame({"Enc(x) preview": server_data["encrypted_feature_previews"]}),
                 width="stretch",
             )
-        feature_count = result.get("request_payload", {}).get("feature_count", len(sample))
         st.write(
             "Operation counts: "
-            f"умножений ciphertext×weight = {feature_count}; сложений = {max(feature_count - 1, 0)}"
+            f"умножений ciphertext×weight = {server_data['multiplication_count']}; "
+            f"сложений = {server_data['addition_count']}"
         )
-        encrypted_score = result.get("encrypted_score")
         _show_if_present(
             "Encrypted bias/result",
-            None if encrypted_score is None else _preview(encrypted_score, 80),
+            server_data["encrypted_score_preview"],
             code=True,
         )
-        server_compute = result.get("server_compute_ms")
+        server_compute = server_data["server_compute_ms"]
         st.metric(
             "Server compute time", "—" if server_compute is None else f"{server_compute:.1f} мс"
         )
