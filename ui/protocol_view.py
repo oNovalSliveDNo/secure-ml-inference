@@ -125,11 +125,11 @@ def render_protocol_exchange_layout(
 
     with transport_col:
         if current_step == 4:
-            st.markdown("**Enc(x), public key ───────────────→**")
+            st.markdown("**Enc(x), public key ─────────>**")
         elif current_step == 5:
-            st.markdown("**Enc(z) ←───────────────**")
+            st.markdown("**Enc(z) <─────────**")
         else:
-            st.markdown("───────────────")
+            st.markdown("──────────")
         if "request_payload" in result:
             st.metric("Payload size", result.get("encrypted_bytes", "—"))
             st.metric("Feature count", result["request_payload"].get("feature_count", "—"))

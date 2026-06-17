@@ -130,20 +130,9 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     x_test = scenario["x_test"]
     y_test = scenario["y_test"]
     model = scenario["model"]
-    # label_names = {0: "malignant (злокачественная)", 1: "benign (доброкачественная)"}
 
     sample_idx = st.slider("Шаг 0. Выберите индекс тестового образца", 0, len(x_test) - 1, 0)
     sample = x_test.iloc[sample_idx]
-
-    step1_col, step1_note = st.columns([3, 2])
-    with step1_col:
-        st.subheader("Исходные признаки (видны только клиенту)")
-        st.dataframe(
-            pd.DataFrame({"Признак": sample.index, "Значение": sample.values}),
-            width="stretch",
-        )
-    with step1_note:
-        st.warning("Эти данные не отправляются на сервер.")
 
     st.session_state.setdefault(
         "demo_state",
@@ -159,41 +148,25 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
 
     wizard_state: dict[str, Any] = st.session_state.demo_state
     result: dict[str, Any] = wizard_state["result"]
-    current_step = wizard_state["step"]
+    current_step = int(wizard_state["step"])
 
-    if st.button("Начать заново"):
+    def reset_demo() -> None:
         st.session_state.demo_state = ProtocolState(
             scenario_id=scenario_id, sample_idx=sample_idx
         ).to_session_dict()
-        st.rerun()
 
-    render_step_statuses(
-        [
-            "Шаг 1. Масштабирование",
-            "Шаг 2. Кодирование",
-            "Шаг 3. Генерация ключей и шифрование",
-            "Шаг 4. Отправка на сервер",
-            "Шаг 5. Расшифровка",
-            "Шаг 6. Постобработка и сравнение",
-            "Шаг 7. Итоговая сводка",
-        ],
-        current_step,
-    )
+    def execute_next_step() -> bool:
+        """Execute exactly one pending operation and advance the demo state by at most one."""
+        step = int(wizard_state["step"])
+        if step >= 7:
+            return True
 
-    render_protocol_exchange_layout(
-        result=result,
-        scenario=scenario,
-        sample=sample,
-        current_step=current_step,
-        scale=SCALE,
-        scenario_id=scenario_id,
-    )
+        if step == 0:
+            wizard_state["step"] = 1
+            return True
 
-    if current_step >= 1:
-        with st.expander("Шаг 1. Масштабирование", expanded=current_step == 1):
-            if "x_scaled" in result:
-                pass
-            elif st.button("Масштабировать признаки", type="primary"):
+        if step == 1:
+            if "x_scaled" not in result:
                 client = Client(scaler=scenario["scaler"], scale=SCALE, key_length=KEY_LENGTH)
                 t0 = time.perf_counter()
                 x_scaled = client.preprocess(sample.to_numpy(dtype=float).reshape(1, -1))
@@ -204,75 +177,25 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                         "scaling_ms": (time.perf_counter() - t0) * 1000.0,
                     }
                 )
-                wizard_state["step"] = 2
-                st.rerun()
-            if "x_scaled" in result:
-                st.dataframe(
-                    pd.DataFrame(
-                        {
-                            "Признак": sample.index,
-                            "Исходное значение": sample.values,
-                            "После масштабирования": result["x_scaled"],
-                        }
-                    ),
-                    width="stretch",
-                )
+            wizard_state["step"] = 2
+            return True
 
-    if current_step >= 2:
-        with st.expander("Шаг 2. Кодирование", expanded=current_step == 2):
-            if "x_int" not in result and st.button("Закодировать в целые числа", type="primary"):
-                client = result["client"]
-                # result["x_scaled"] уже одномерный, его и кодируем
-                result["x_int"] = client.encode(result["x_scaled"])
-                wizard_state["step"] = 3
-                st.rerun()
-            if "x_int" in result:
-                st.dataframe(
-                    pd.DataFrame(
-                        {
-                            "После масштабирования": result["x_scaled"],
-                            "Целое число": result["x_int"],
-                        }
-                    ),
-                    width="stretch",
-                )
+        if step == 2:
+            if "x_int" not in result:
+                result["x_int"] = result["client"].encode(result["x_scaled"])
+            wizard_state["step"] = 3
+            return True
 
-    if current_step >= 3:
-        with st.expander("Шаг 3. Генерация ключей и шифрование", expanded=current_step == 3):
-            if "enc_x" not in result and st.button(
-                "Сгенерировать ключи и зашифровать", type="primary"
-            ):
-                client = result["client"]
+        if step == 3:
+            if "enc_x" not in result:
                 t1 = time.perf_counter()
-                result["enc_x"] = client.encrypt(result["x_int"])
+                result["enc_x"] = result["client"].encrypt(result["x_int"])
                 result["encrypt_ms"] = (time.perf_counter() - t1) * 1000.0
-                wizard_state["step"] = 4
-                st.rerun()
-            if "enc_x" in result:
-                client = result["client"]
-                st.caption("Открытая часть ключа, которая передаётся серверу:")
-                st.code(f"n = {str(client.public_key.n)[:48]}...")
-                st.dataframe(
-                    pd.DataFrame(
-                        {
-                            "Целое число": result["x_int"],
-                            "Зашифрованное значение": [
-                                serialize_ciphertext(v)[:36] + "..." for v in result["enc_x"]
-                            ],
-                            "Размер (байт)": [
-                                len(serialize_ciphertext(v).encode("utf-8"))
-                                for v in result["enc_x"]
-                            ],
-                        }
-                    ),
-                    width="stretch",
-                )
+            wizard_state["step"] = 4
+            return True
 
-    if current_step >= 4:
-        with st.expander("Шаг 4. Отправка на сервер", expanded=current_step == 4):
-            if "encrypted_score" not in result and st.button(
-                "Отправить зашифрованный запрос", type="primary"
-            ):
+        if step == 4:
+            if "encrypted_score" not in result:
                 client = result["client"]
                 payload = {
                     "public_key_n": str(client.public_key.n),
@@ -287,13 +210,13 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                     response.raise_for_status()
                 except requests.RequestException as exc:
                     st.error(f"Ошибка при обращении к серверу ({API_URL}): {exc}")
-                    return
+                    return False
                 http_elapsed_ms = (time.perf_counter() - t_http0) * 1000.0
                 response_payload = response.json()
                 encrypted_score_str = response_payload.get("encrypted_score")
                 if not isinstance(encrypted_score_str, str):
                     st.error("Некорректный ответ сервера: отсутствует зашифрованный результат.")
-                    return
+                    return False
                 result.update(
                     {
                         "request_payload": payload,
@@ -303,28 +226,11 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                         "encrypted_score": encrypted_score_str,
                     }
                 )
-                wizard_state["step"] = 5
-                st.rerun()
-            if "request_payload" in result:
-                st.json(
-                    {
-                        "Открытая часть ключа": result["request_payload"]["public_key_n"][:32]
-                        + "...",
-                        "Первые зашифрованные признаки": [
-                            c[:32] + "..."
-                            for c in result["request_payload"]["encrypted_features"][:3]
-                        ],
-                        "Масштаб кодирования": result["request_payload"]["scale"],
-                        "Количество признаков": result["request_payload"]["feature_count"],
-                    }
-                )
-                st.write(
-                    f"Статус ответа сервера: {result['status_code']}; время вычисления на сервере: {result['server_compute_ms']} мс"
-                )
+            wizard_state["step"] = 5
+            return True
 
-    if current_step >= 5:
-        with st.expander("Шаг 5. Расшифровка", expanded=current_step == 5):
-            if "z_secure" not in result and st.button("Расшифровать результат", type="primary"):
+        if step == 5:
+            if "comparison_df" not in result:
                 client = result["client"]
                 t_dec0 = time.perf_counter()
                 enc_score = deserialize_ciphertext(client.public_key, result["encrypted_score"])
@@ -336,31 +242,6 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                         "decrypt_ms": (time.perf_counter() - t_dec0) * 1000.0,
                     }
                 )
-                wizard_state["step"] = 6
-                st.rerun()
-            if "z_secure" in result:
-                st.dataframe(
-                    pd.DataFrame(
-                        [
-                            {
-                                "Этап": "Зашифрованный результат",
-                                "Значение": result["encrypted_score"][:80] + "...",
-                            },
-                            {"Этап": "Целочисленный результат", "Значение": result["score_int"]},
-                            {
-                                "Этап": "Расшифрованное значение z",
-                                "Значение": f"{result['z_secure']:.6f}",
-                            },
-                        ]
-                    ),
-                    width="stretch",
-                )
-
-    if current_step >= 6:
-        with st.expander("Шаг 6. Постобработка и сравнение", expanded=current_step == 6):
-            if "comparison_df" not in result and st.button(
-                "Получить прогноз и сравнить", type="primary"
-            ):
                 x_raw = sample.to_numpy(dtype=float).reshape(1, -1)
                 x_scaled = np.array(result["x_scaled"])
                 w, b = scenario["w"], scenario["b"]
@@ -448,6 +329,11 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                             },
                         ]
                     )
+            wizard_state["step"] = 6
+            return True
+
+        if step == 6:
+            if "encrypted_bytes" not in result:
                 payload = result["request_payload"]
                 result["encrypted_bytes"] = measure_payload_size(payload)
                 result["plaintext_bytes"] = measure_payload_size(
@@ -456,13 +342,181 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                 result["overhead_ratio"] = result["encrypted_bytes"] / max(
                     result["plaintext_bytes"], 1
                 )
-                wizard_state["step"] = 7
-                st.rerun()
+            wizard_state["step"] = 7
+            return True
+
+        return True
+
+    controls = st.columns(4)
+    with controls[0]:
+        start_clicked = st.button("Запустить демонстрацию", disabled=current_step != 0)
+    with controls[1]:
+        next_clicked = st.button("Следующий шаг", disabled=current_step >= 7)
+    with controls[2]:
+        finish_clicked = st.button("Выполнить до конца", disabled=current_step >= 7)
+    with controls[3]:
+        restart_clicked = st.button("Начать заново")
+
+    if restart_clicked:
+        reset_demo()
+        st.rerun()
+    if (start_clicked or next_clicked) and execute_next_step():
+        st.rerun()
+    if finish_clicked:
+        while int(wizard_state["step"]) < 7:
+            if not execute_next_step():
+                break
+        st.rerun()
+
+    current_step = int(wizard_state["step"])
+    st.subheader(f"Шаг {current_step} из 7")
+
+    step1_col, step1_note = st.columns([3, 2])
+    with step1_col:
+        st.subheader("Исходные признаки (видны только клиенту)")
+        st.dataframe(
+            pd.DataFrame({"Признак": sample.index, "Значение": sample.values}),
+            width="stretch",
+        )
+    with step1_note:
+        st.warning("Эти данные не отправляются на сервер.")
+
+    render_step_statuses(
+        [
+            "Шаг 1. Масштабирование",
+            "Шаг 2. Кодирование",
+            "Шаг 3. Генерация ключей и шифрование",
+            "Шаг 4. Отправка запроса",
+            "Шаг 5. Серверное вычисление и возврат ответа",
+            "Шаг 6. Расшифрование и постобработка",
+            "Шаг 7. Итоговые метрики",
+        ],
+        current_step,
+    )
+
+    render_protocol_exchange_layout(
+        result=result,
+        scenario=scenario,
+        sample=sample,
+        current_step=current_step,
+        scale=SCALE,
+        scenario_id=scenario_id,
+    )
+
+    if current_step >= 1:
+        with st.expander("Шаг 1. Масштабирование", expanded=current_step == 1):
+            if "x_scaled" in result:
+                st.dataframe(
+                    pd.DataFrame(
+                        {
+                            "Признак": sample.index,
+                            "Исходное значение": sample.values,
+                            "После масштабирования": result["x_scaled"],
+                        }
+                    ),
+                    width="stretch",
+                )
+            else:
+                st.info("Нажмите «Следующий шаг», чтобы выполнить масштабирование.")
+
+    if current_step >= 2:
+        with st.expander("Шаг 2. Кодирование", expanded=current_step == 2):
+            if "x_int" in result:
+                st.dataframe(
+                    pd.DataFrame(
+                        {
+                            "После масштабирования": result["x_scaled"],
+                            "Целое число": result["x_int"],
+                        }
+                    ),
+                    width="stretch",
+                )
+
+    if current_step >= 3:
+        with st.expander("Шаг 3. Генерация ключей и шифрование", expanded=current_step == 3):
+            if "enc_x" in result:
+                client = result["client"]
+                st.caption("Открытая часть ключа, которая передаётся серверу:")
+                st.code(f"n = {str(client.public_key.n)[:48]}...")
+                st.dataframe(
+                    pd.DataFrame(
+                        {
+                            "Целое число": result["x_int"],
+                            "Зашифрованное значение": [
+                                serialize_ciphertext(v)[:36] + "..." for v in result["enc_x"]
+                            ],
+                            "Размер (байт)": [
+                                len(serialize_ciphertext(v).encode("utf-8"))
+                                for v in result["enc_x"]
+                            ],
+                        }
+                    ),
+                    width="stretch",
+                )
+
+    if current_step >= 4:
+        with st.expander("Шаг 4. Отправка запроса", expanded=current_step == 4):
+            if "request_payload" in result:
+                st.json(
+                    {
+                        "Открытая часть ключа": result["request_payload"]["public_key_n"][:32]
+                        + "...",
+                        "Первые зашифрованные признаки": [
+                            c[:32] + "..."
+                            for c in result["request_payload"]["encrypted_features"][:3]
+                        ],
+                        "Масштаб кодирования": result["request_payload"]["scale"],
+                        "Количество признаков": result["request_payload"]["feature_count"],
+                    }
+                )
+            else:
+                st.info("Запрос будет отправлен на следующем шаге.")
+
+    if current_step >= 5:
+        with st.expander(
+            "Шаг 5. Серверное вычисление и возврат ответа", expanded=current_step == 5
+        ):
+            if "encrypted_score" in result:
+                st.write(
+                    f"Статус ответа сервера: {result['status_code']}; "
+                    f"время вычисления на сервере: {result['server_compute_ms']} мс"
+                )
+                st.code(result["encrypted_score"][:80] + "...")
+
+    if current_step >= 6:
+        with st.expander("Шаг 6. Расшифрование и постобработка", expanded=current_step == 6):
+            if "z_secure" in result:
+                st.dataframe(
+                    pd.DataFrame(
+                        [
+                            {
+                                "Этап": "Зашифрованный результат",
+                                "Значение": result["encrypted_score"][:80] + "...",
+                            },
+                            {"Этап": "Целочисленный результат", "Значение": result["score_int"]},
+                            {
+                                "Этап": "Расшифрованное значение z",
+                                "Значение": f"{result['z_secure']:.6f}",
+                            },
+                        ]
+                    ),
+                    width="stretch",
+                )
             if "comparison_df" in result:
                 st.dataframe(result["comparison_df"], width="stretch")
 
     if current_step >= 7 and "comparison_df" in result:
-        st.subheader("Шаг 7. Итоговая сводка")
+        with st.expander("Шаг 7. Итоговые метрики", expanded=True):
+            if "encrypted_bytes" not in result:
+                payload = result["request_payload"]
+                result["encrypted_bytes"] = measure_payload_size(payload)
+                result["plaintext_bytes"] = measure_payload_size(
+                    sample.to_numpy(dtype=float).tolist()
+                )
+                result["overhead_ratio"] = result["encrypted_bytes"] / max(
+                    result["plaintext_bytes"], 1
+                )
+            st.subheader("Шаг 7. Итоговые метрики")
 
     render_calculation_trace(result=result, scenario=scenario, sample=sample, scale=SCALE)
     render_sample_level_metrics(result, scenario_id)

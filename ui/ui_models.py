@@ -31,7 +31,7 @@ class ProtocolState:
 
     scenario_id: str
     sample_idx: int
-    step: int = 1
+    step: int = 0
     result: dict[str, Any] = field(default_factory=dict)
 
     def to_session_dict(self) -> dict[str, Any]:
