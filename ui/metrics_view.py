@@ -4,12 +4,22 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 if TYPE_CHECKING:
     from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from sklearn.datasets import load_diabetes
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
 
+from app.client import Client
+from app.config import KEY_LENGTH, RANDOM_STATE, SCALE, TEST_SIZE
+from app.encoding import decode_score, encode_bias, encode_weights, encoded_plaintext_score
+from app.linear_scorer import EncryptedLinearScorer
+from app.model import load_model
 from ui.components import render_metric_card
 from ui.metrics_helpers import (
     DEFAULT_FIDELITY_TOLERANCE,
@@ -363,6 +373,172 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
             render_metric_card("HTTP roundtrip", _format_ms(result.get("http_elapsed_ms")))
 
 
+def _regression_quality_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    """Compute aggregate regression quality metrics."""
+    mse = float(mean_squared_error(y_true, y_pred))
+    return {
+        "MAE": float(mean_absolute_error(y_true, y_pred)),
+        "RMSE": mse**0.5,
+        "R²": float(r2_score(y_true, y_pred)),
+    }
+
+
+def _quality_delta(metric_name: str, baseline_value: float, phe_value: float) -> float:
+    """Return quality-oriented signed delta for a metric.
+
+    Positive values always mean that PHE improved quality relative to baseline;
+    negative values mean that PHE degraded quality.
+    """
+    if metric_name in {"MAE", "RMSE"}:
+        return baseline_value - phe_value
+    return phe_value - baseline_value
+
+
+@st.cache_data(show_spinner=False)
+def _compute_aggregate_regression_payload() -> tuple[pd.DataFrame, dict[str, float]]:
+    """Compute baseline, encoded plaintext, and PHE predictions for the full regression test set."""
+    model_path = "results/models/regression_model.pkl"
+    model = load_model(model_path)
+
+    dataset = load_diabetes(as_frame=True)
+    features = dataset.data
+    target = dataset.target
+    _, x_test, _, y_test = train_test_split(
+        features,
+        target,
+        test_size=TEST_SIZE,
+        random_state=RANDOM_STATE,
+    )
+    y_true = y_test.to_numpy(dtype=np.float64)
+    baseline_predictions = np.asarray(model.predict(x_test), dtype=np.float64)
+
+    scaler = model.named_steps["scaler"]
+    regressor = model.named_steps["regressor"]
+    weights = np.asarray(regressor.coef_, dtype=np.float64)
+    bias = float(regressor.intercept_)
+    encoded_weights = encode_weights(w=weights, scale=SCALE)
+    encoded_bias = encode_bias(b=bias, scale=SCALE)
+
+    client = Client(scaler=scaler, scale=SCALE, key_length=KEY_LENGTH)
+    server = EncryptedLinearScorer(
+        w_int=encoded_weights,
+        b_int=encoded_bias,
+        public_key=client.public_key,
+    )
+
+    encoded_predictions: list[float] = []
+    phe_predictions: list[float] = []
+    for row_idx in range(len(x_test)):
+        x_raw = x_test.iloc[[row_idx]]
+        x_scaled = client.preprocess(x_raw).reshape(-1)
+        encoded_predictions.append(
+            float(encoded_plaintext_score(x=x_scaled, w=weights, b=bias, scale=SCALE))
+        )
+
+        x_int = client.encode(x_scaled)
+        encrypted_features = client.encrypt(x_int)
+        encrypted_score = server.compute_encrypted_score(encrypted_features)
+        score_int = client.private_key.decrypt(encrypted_score)
+        phe_predictions.append(decode_score(score_int=score_int, scale=SCALE))
+
+    encoded_array = np.asarray(encoded_predictions, dtype=np.float64)
+    phe_array = np.asarray(phe_predictions, dtype=np.float64)
+    metrics_by_mode = {
+        "Baseline": _regression_quality_metrics(y_true, baseline_predictions),
+        "Encoded": _regression_quality_metrics(y_true, encoded_array),
+        "PHE": _regression_quality_metrics(y_true, phe_array),
+    }
+    rows = []
+    for metric_name in ("MAE", "RMSE", "R²"):
+        baseline_value = metrics_by_mode["Baseline"][metric_name]
+        phe_value = metrics_by_mode["PHE"][metric_name]
+        rows.append(
+            {
+                "Метрика": metric_name,
+                "Baseline": baseline_value,
+                "Encoded": metrics_by_mode["Encoded"][metric_name],
+                "PHE": phe_value,
+                "Δ PHE относительно baseline": _quality_delta(
+                    metric_name=metric_name,
+                    baseline_value=baseline_value,
+                    phe_value=phe_value,
+                ),
+            }
+        )
+
+    diff_phe_baseline = np.abs(phe_array - baseline_predictions)
+    diff_phe_encoded = np.abs(phe_array - encoded_array)
+    details = {
+        "mean_abs_diff_phe_baseline": float(np.mean(diff_phe_baseline)),
+        "max_abs_diff_phe_baseline": float(np.max(diff_phe_baseline)),
+        "mean_abs_diff_phe_encoded": float(np.mean(diff_phe_encoded)),
+        "max_abs_diff_phe_encoded": float(np.max(diff_phe_encoded)),
+        "match_rate_tol_1e_2": float(np.mean(diff_phe_baseline <= DEFAULT_FIDELITY_TOLERANCE)),
+    }
+    return pd.DataFrame(rows), details
+
+
+def _style_quality_delta(value: Any) -> str:
+    """Color quality deltas without coloring absolute baseline values."""
+    number = _to_float(value)
+    if number is None:
+        return ""
+    if number >= -1e-9:
+        return "background-color: #e6f4ea; color: #137333; font-weight: 600;"
+    return "background-color: #fce8e6; color: #a50e0e; font-weight: 600;"
+
+
+def render_aggregate_regression_metrics() -> None:
+    """Render aggregate regression quality/fidelity panel for the full test set."""
+    st.subheader("Aggregate regression panel")
+    st.info(
+        "Абсолютное качество определяется базовой Ridge-моделью. "
+        "Защищённый режим практически не изменяет её агрегированные метрики."
+    )
+    try:
+        metrics_df, details = _compute_aggregate_regression_payload()
+    except Exception as exc:
+        st.warning(f"Не удалось рассчитать aggregate regression metrics: {exc}")
+        return
+
+    styled_metrics = metrics_df.style.format(
+        {
+            "Baseline": "{:.6f}",
+            "Encoded": "{:.6f}",
+            "PHE": "{:.6f}",
+            "Δ PHE относительно baseline": "{:+.6f}",
+        }
+    ).map(_style_quality_delta, subset=["Δ PHE относительно baseline"])
+    st.dataframe(styled_metrics, width="stretch", hide_index=True)
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    with c1:
+        render_metric_card(
+            "Mean |PHE − baseline|",
+            _format_number(details["mean_abs_diff_phe_baseline"], digits=6),
+        )
+    with c2:
+        render_metric_card(
+            "Max |PHE − baseline|",
+            _format_number(details["max_abs_diff_phe_baseline"], digits=6),
+        )
+    with c3:
+        render_metric_card(
+            "Mean |PHE − encoded|",
+            _format_number(details["mean_abs_diff_phe_encoded"], digits=6),
+        )
+    with c4:
+        render_metric_card(
+            "Max |PHE − encoded|",
+            _format_number(details["max_abs_diff_phe_encoded"], digits=6),
+        )
+    with c5:
+        render_metric_card(
+            "Match rate @ 1e-2",
+            f"{details['match_rate_tol_1e_2']:.2%}",
+        )
+
+
 def show_metrics_dashboard(tables_dir: Path, plots_dir: Path) -> None:
     """Render aggregate-level experiment evidence with explanatory comments."""
     st.header("Результаты экспериментов")
@@ -377,6 +553,7 @@ def show_metrics_dashboard(tables_dir: Path, plots_dir: Path) -> None:
         st.info(
             "Файлы с таблицами метрик отсутствуют в results/tables/. Запустите эксперименты для формирования табличных результатов."
         )
+        render_aggregate_regression_metrics()
     for csv_file in csv_files:
         try:
             df = pd.read_csv(csv_file)
