@@ -342,11 +342,20 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
                     pred_baseline_value = float(baseline_value)
                     pred_encoded_value = float(z_encoded)
                     pred_secure_value = float(result["z_secure"])
+                    y_true_all = y_test.to_numpy(dtype=float)
+                    y_pred_all = model.predict(x_test).astype(float)
+                    abs_errors = np.abs(y_pred_all - y_true_all)
+                    sample_abs_error = abs(pred_baseline_value - float(y_test.iloc[sample_idx]))
                     result.update(
                         {
                             "pred_baseline": pred_baseline_value,
                             "pred_encoded": pred_encoded_value,
                             "pred_secure": pred_secure_value,
+                            "baseline_median_abs_error": float(np.median(abs_errors)),
+                            "baseline_p90_abs_error": float(np.percentile(abs_errors, 90)),
+                            "baseline_error_percentile": float(
+                                100.0 * np.mean(abs_errors <= sample_abs_error)
+                            ),
                         }
                     )
                     result["comparison_df"] = pd.DataFrame(

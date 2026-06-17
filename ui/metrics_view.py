@@ -12,6 +12,71 @@ import streamlit as st
 
 from ui.components import render_metric_card
 
+DEFAULT_FIDELITY_TOLERANCE = 0.01
+
+
+def _to_float(value: Any) -> float | None:
+    """Convert a value to float when possible."""
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_number(value: Any, digits: int = 6) -> str:
+    """Format a numeric value for compact metric display."""
+    number = _to_float(value)
+    if number is None:
+        return "—"
+    return f"{number:.{digits}f}"
+
+
+def _format_bytes(value: Any) -> str:
+    """Format a byte count for metric display."""
+    number = _to_float(value)
+    if number is None:
+        return "—"
+    return f"{int(number)} байт"
+
+
+def _format_ms(value: Any) -> str:
+    """Format milliseconds for metric display."""
+    number = _to_float(value)
+    if number is None:
+        return "—"
+    return f"{number:.2f} мс"
+
+
+def classify_sample_error_status(
+    abs_error: float | None, median_abs_error: float | None, p90_abs_error: float | None
+) -> tuple[str, str]:
+    """Classify selected regression-sample baseline error against baseline-error distribution."""
+    if abs_error is None or median_abs_error is None or p90_abs_error is None:
+        return "Недостаточно данных", "off"
+    if abs_error <= median_abs_error:
+        return "Ошибка не выше медианной", "normal"
+    if abs_error <= p90_abs_error:
+        return "Ошибка между медианой и p90", "warning"
+    return "Ошибка выше p90", "critical"
+
+
+def classify_fidelity_status(max_delta: float | None, tolerance: float | None) -> tuple[str, str]:
+    """Classify encoding/PHE fidelity against a numeric tolerance."""
+    if max_delta is None or tolerance is None:
+        return "Недостаточно данных", "off"
+    if max_delta <= tolerance:
+        return "В пределах допуска", "normal"
+    return "Выше допуска", "critical"
+
+
+def _render_status(label: str, status: tuple[str, str]) -> None:
+    """Render a status line without implying model quality loss."""
+    status_text, level = status
+    icon = {"normal": "✅", "warning": "⚠️", "critical": "❌"}.get(level, "ℹ️")
+    st.markdown(f"**{label}:** {icon} {status_text}")
+
 
 def _get_table_explanation(csv_name: str, df: pd.DataFrame) -> str:
     """Return a concise Russian explanation for metrics table."""
@@ -149,53 +214,172 @@ def _prepare_display_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> None:
-    """Render metrics for the currently selected sample."""
-    k1, k2, k3, k4, k5 = st.columns(5)
+    """Render sample-level evidence split into model quality, fidelity, and privacy/overhead."""
+    st.markdown("### Sample-level метрики")
     if "overhead_ratio" not in result:
-        for col, label in zip(
-            [k1, k2, k3, k4, k5],
-            [
-                "Сервер видит исходные признаки",
-                "Совпадение с обычной моделью",
-                "Увеличение размера запроса",
-                "Зашифрованный запрос",
-                "Обычный запрос",
-            ],
-            strict=True,
-        ):
-            with col:
-                render_metric_card(label, "НЕТ" if col == k1 else "—")
+        st.info("Итоговые sample-level метрики появятся после выполнения всех шагов протокола.")
         return
-    with k1:
-        render_metric_card("Сервер видит исходные признаки", "НЕТ")
-    if scenario_id == "classification":
-        match_label = "ДА" if result.get("pred_secure") == result.get("pred_baseline") else "НЕТ"
-        with k2:
-            render_metric_card("Совпадение с обычной моделью", match_label)
-    else:
-        delta = abs(float(result["pred_secure"]) - float(result["pred_baseline"]))
-        with k2:
-            render_metric_card(
-                "Прогноз близок к обычной модели",
-                "ДА" if delta < 0.01 else "НЕТ",
-                f"Δ = {delta:.4f}",
+    baseline_value = result.get("pred_baseline", result.get("baseline_value"))
+    encoded_value = result.get("pred_encoded", result.get("z_encoded"))
+    secure_value = result.get("pred_secure", result.get("z_secure"))
+    true_value = result.get("true_label")
+
+    with st.container(border=True):
+        st.subheader("1. Качество исходной ML-модели")
+        if scenario_id == "classification":
+            true_class = int(true_value) if true_value is not None else "—"
+            baseline_class = int(baseline_value) if baseline_value is not None else "—"
+            probability = result.get("prob_baseline")
+            correctness = (
+                "ДА"
+                if true_value is not None
+                and baseline_value is not None
+                and int(true_value) == int(baseline_value)
+                else "НЕТ"
             )
-    with k3:
-        render_metric_card("Увеличение размера запроса", f"{result['overhead_ratio']:.2f}x")
-    with k4:
-        render_metric_card("Зашифрованный запрос", f"{result['encrypted_bytes']} байт")
-    with k5:
-        render_metric_card("Обычный запрос", f"{result['plaintext_bytes']} байт")
-    if scenario_id == "regression":
-        delta_baseline = abs(float(result["pred_secure"]) - float(result["pred_baseline"]))
-        delta_encoded = abs(float(result["pred_secure"]) - float(result["pred_encoded"]))
-        r1, r2 = st.columns(2)
-        with r1:
-            render_metric_card("Разность защищённого и обычного прогноза", f"{delta_baseline:.6f}")
-        with r2:
-            render_metric_card(
-                "Разность защищённого и кодированного прогноза", f"{delta_encoded:.6f}"
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                render_metric_card("Истинный класс", true_class)
+            with c2:
+                render_metric_card("Класс baseline", baseline_class)
+            with c3:
+                render_metric_card("Вероятность baseline", _format_number(probability, digits=4))
+            with c4:
+                render_metric_card("Baseline корректен", correctness)
+        else:
+            true_number = _to_float(true_value)
+            baseline_number = _to_float(baseline_value)
+            abs_error = (
+                abs(baseline_number - true_number)
+                if baseline_number is not None and true_number is not None
+                else None
             )
+            relative_error = (
+                abs_error / abs(true_number)
+                if abs_error is not None and true_number is not None and true_number != 0.0
+                else None
+            )
+            median_abs_error = _to_float(result.get("baseline_median_abs_error"))
+            p90_abs_error = _to_float(result.get("baseline_p90_abs_error"))
+            error_percentile = _to_float(result.get("baseline_error_percentile"))
+            _render_status(
+                "Статус ошибки baseline",
+                classify_sample_error_status(abs_error, median_abs_error, p90_abs_error),
+            )
+            r1, r2, r3, r4 = st.columns(4)
+            with r1:
+                render_metric_card("Истинное значение", _format_number(true_number, digits=4))
+            with r2:
+                render_metric_card("Baseline prediction", _format_number(baseline_number, digits=4))
+            with r3:
+                render_metric_card("Абсолютная ошибка", _format_number(abs_error, digits=4))
+            with r4:
+                render_metric_card(
+                    "Относительная ошибка",
+                    "—" if relative_error is None else f"{relative_error:.2%}",
+                )
+            r5, r6, r7 = st.columns(3)
+            with r5:
+                render_metric_card("Median abs error", _format_number(median_abs_error, digits=4))
+            with r6:
+                render_metric_card("p90 abs error", _format_number(p90_abs_error, digits=4))
+            with r7:
+                percentile_value = "—" if error_percentile is None else f"{error_percentile:.1f}%"
+                render_metric_card("Percentile ошибки объекта", percentile_value)
+
+    with st.container(border=True):
+        st.subheader("2. Влияние кодирования и шифрования")
+        fidelity_baseline_value = (
+            result.get("prob_baseline") if scenario_id == "classification" else baseline_value
+        )
+        fidelity_encoded_value = (
+            result.get("prob_encoded") if scenario_id == "classification" else encoded_value
+        )
+        fidelity_secure_value = (
+            result.get("prob_secure") if scenario_id == "classification" else secure_value
+        )
+        baseline_number = _to_float(fidelity_baseline_value)
+        encoded_number = _to_float(fidelity_encoded_value)
+        secure_number = _to_float(fidelity_secure_value)
+        delta_encoded_baseline = (
+            abs(encoded_number - baseline_number)
+            if encoded_number is not None and baseline_number is not None
+            else None
+        )
+        delta_secure_baseline = (
+            abs(secure_number - baseline_number)
+            if secure_number is not None and baseline_number is not None
+            else None
+        )
+        delta_secure_encoded = (
+            abs(secure_number - encoded_number)
+            if secure_number is not None and encoded_number is not None
+            else None
+        )
+        tolerance = _to_float(result.get("fidelity_tolerance", DEFAULT_FIDELITY_TOLERANCE))
+        deltas = [
+            d
+            for d in (delta_encoded_baseline, delta_secure_baseline, delta_secure_encoded)
+            if d is not None
+        ]
+        max_delta = max(deltas) if deltas else None
+        margin = tolerance - max_delta if tolerance is not None and max_delta is not None else None
+        _render_status("Статус fidelity", classify_fidelity_status(max_delta, tolerance))
+        f1, f2, f3, f4 = st.columns(4)
+        with f1:
+            render_metric_card("Baseline", _format_number(baseline_number, digits=6))
+        with f2:
+            render_metric_card("Encoded plaintext", _format_number(encoded_number, digits=6))
+        with f3:
+            render_metric_card("PHE prediction", _format_number(secure_number, digits=6))
+        with f4:
+            render_metric_card("Tolerance", _format_number(tolerance, digits=6))
+        f5, f6, f7, f8 = st.columns(4)
+        with f5:
+            render_metric_card(
+                "Δ encoded vs baseline", _format_number(delta_encoded_baseline, digits=6)
+            )
+        with f6:
+            render_metric_card("Δ PHE vs baseline", _format_number(delta_secure_baseline, digits=6))
+        with f7:
+            render_metric_card("Δ PHE vs encoded", _format_number(delta_secure_encoded, digits=6))
+        with f8:
+            render_metric_card("Запас до tolerance", _format_number(margin, digits=6))
+
+    with st.container(border=True):
+        st.subheader("3. Конфиденциальность и накладные расходы")
+        p1, p2, p3, p4 = st.columns(4)
+        with p1:
+            render_metric_card("Сервер видит исходные признаки", "НЕТ")
+        with p2:
+            render_metric_card("Закрытый ключ передан серверу", "НЕТ")
+        with p3:
+            render_metric_card("Запрос зашифрован", "ДА")
+        with p4:
+            render_metric_card(
+                "Overhead ratio",
+                f"{_to_float(result.get('overhead_ratio')):.2f}x"
+                if _to_float(result.get("overhead_ratio")) is not None
+                else "—",
+            )
+        p5, p6, p7, p8 = st.columns(4)
+        with p5:
+            render_metric_card(
+                "Plaintext request size", _format_bytes(result.get("plaintext_bytes"))
+            )
+        with p6:
+            render_metric_card(
+                "Encrypted request size", _format_bytes(result.get("encrypted_bytes"))
+            )
+        with p7:
+            render_metric_card("Encryption time", _format_ms(result.get("encrypt_ms")))
+        with p8:
+            render_metric_card("Server compute time", _format_ms(result.get("server_compute_ms")))
+        p9, p10 = st.columns(2)
+        with p9:
+            render_metric_card("Decryption time", _format_ms(result.get("decrypt_ms")))
+        with p10:
+            render_metric_card("HTTP roundtrip", _format_ms(result.get("http_elapsed_ms")))
 
 
 def show_metrics_dashboard(tables_dir: Path, plots_dir: Path) -> None:
