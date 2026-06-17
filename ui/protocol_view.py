@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from app.config import KEY_LENGTH
+from app.crypto import serialize_ciphertext
 from ui.components import render_arrow, render_card, render_compact_kpi, render_operation_card
 from ui.styles import PALETTE
 
@@ -16,6 +17,25 @@ from ui.styles import PALETTE
 def _preview(value: Any, chars: int = 48) -> str:
     text = str(value)
     return text if len(text) <= chars else f"{text[:chars]}..."
+
+
+def _ciphertext_preview(value: Any, chars: int = 64) -> str:
+    if callable(getattr(value, "ciphertext", None)):
+        try:
+            text = serialize_ciphertext(value)
+        except (AttributeError, TypeError, ValueError):
+            text = str(value.ciphertext())
+    else:
+        text = str(value)
+
+    if len(text) <= chars:
+        return text
+    if chars <= 3:
+        return text[:chars]
+
+    edge_chars = (chars - 3) // 2
+    leading_chars = edge_chars + ((chars - 3) % 2)
+    return f"{text[:leading_chars]}...{text[-edge_chars:]}"
 
 
 def _fmt(value: Any, digits: int = 2) -> str:
@@ -73,13 +93,15 @@ def build_server_panel_data(
         "coefficient_count": len(scenario.get("w", [])),
         "scale": scale,
         "request_payload": request_payload,
-        "encrypted_feature_previews": [_preview(value, 36) for value in encrypted_features[:5]],
+        "encrypted_feature_previews": [
+            _ciphertext_preview(value, 36) for value in encrypted_features[:5]
+        ],
         "feature_count": feature_count,
         "multiplication_count": feature_count,
         "addition_count": feature_count,
         "encrypted_score_preview": None
         if encrypted_score is None
-        else _preview(encrypted_score, 80),
+        else _ciphertext_preview(encrypted_score, 80),
         "server_compute_ms": result.get("server_compute_ms"),
     }
 
@@ -168,7 +190,8 @@ def render_protocol_exchange_layout(
             st.write(f"Длина ключа: {KEY_LENGTH} бит")
             st.write(f"Зашифровано признаков: {len(result['enc_x'])}")
             st.write("Закрытый ключ остаётся у клиента")
-            st.code(_preview(result["enc_x"][0], 64))
+            st.write("Пример зашифрованного значения")
+            st.code(_ciphertext_preview(result["enc_x"][0], 64))
             if show_table:
                 client = result.get("client")
                 if client is not None:
@@ -177,7 +200,9 @@ def render_protocol_exchange_layout(
                     pd.DataFrame(
                         {
                             "Признак": feature_names,
-                            "Зашифрованное значение": [_preview(v, 80) for v in result["enc_x"]],
+                            "Пример зашифрованного значения": [
+                                _ciphertext_preview(v, 80) for v in result["enc_x"]
+                            ],
                         }
                     ),
                     width="stretch",
