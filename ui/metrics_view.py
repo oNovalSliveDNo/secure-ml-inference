@@ -218,8 +218,8 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
     with st.container(border=True):
         st.subheader("1. Качество исходной ML-модели")
         if scenario_id == "classification":
-            true_class = int(true_value) if true_value is not None else "—"
-            baseline_class = int(baseline_value) if baseline_value is not None else "—"
+            true_class = str(int(true_value)) if true_value is not None else "—"
+            baseline_class = str(int(baseline_value)) if baseline_value is not None else "—"
             probability = result.get("prob_baseline")
             correctness = (
                 "ДА"
@@ -230,13 +230,15 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
             )
             c1, c2, c3, c4 = st.columns(4)
             with c1:
-                render_metric_card("Истинный класс", true_class)
+                render_metric_card("Истинный класс", true_class, None, "neutral")
             with c2:
-                render_metric_card("Класс baseline", baseline_class)
+                render_metric_card("Класс baseline", baseline_class, None, "neutral")
             with c3:
-                render_metric_card("Вероятность baseline", _format_number(probability, digits=4))
+                render_metric_card(
+                    "Вероятность baseline", _format_number(probability, digits=4), None, "neutral"
+                )
             with c4:
-                render_metric_card("Baseline корректен", correctness)
+                render_metric_card("Baseline корректен", correctness, None, "neutral")
         else:
             true_number = _to_float(true_value)
             baseline_number = _to_float(baseline_value)
@@ -259,24 +261,39 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
             )
             r1, r2, r3, r4 = st.columns(4)
             with r1:
-                render_metric_card("Истинное значение", _format_number(true_number, digits=4))
+                render_metric_card(
+                    "Истинное значение", _format_number(true_number, digits=4), None, "neutral"
+                )
             with r2:
-                render_metric_card("Baseline prediction", _format_number(baseline_number, digits=4))
+                render_metric_card(
+                    "Baseline prediction",
+                    _format_number(baseline_number, digits=4),
+                    None,
+                    "neutral",
+                )
             with r3:
-                render_metric_card("Абсолютная ошибка", _format_number(abs_error, digits=4))
+                render_metric_card(
+                    "Абсолютная ошибка", _format_number(abs_error, digits=4), None, "neutral"
+                )
             with r4:
                 render_metric_card(
                     "Относительная ошибка",
                     "—" if relative_error is None else f"{relative_error:.2%}",
+                    None,
+                    "neutral",
                 )
             r5, r6, r7 = st.columns(3)
             with r5:
-                render_metric_card("Median abs error", _format_number(median_abs_error, digits=4))
+                render_metric_card(
+                    "Median abs error", _format_number(median_abs_error, digits=4), None, "neutral"
+                )
             with r6:
-                render_metric_card("p90 abs error", _format_number(p90_abs_error, digits=4))
+                render_metric_card(
+                    "p90 abs error", _format_number(p90_abs_error, digits=4), None, "neutral"
+                )
             with r7:
                 percentile_value = "—" if error_percentile is None else f"{error_percentile:.1f}%"
-                render_metric_card("Percentile ошибки объекта", percentile_value)
+                render_metric_card("Percentile ошибки объекта", percentile_value, None, "neutral")
 
     with st.container(border=True):
         st.subheader("2. Влияние кодирования и шифрования")
@@ -318,59 +335,93 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
         _render_status("Статус fidelity", classify_fidelity_status(delta_secure_baseline))
         f1, f2, f3, f4 = st.columns(4)
         with f1:
-            render_metric_card("Baseline", _format_number(baseline_number, digits=6))
+            render_metric_card(
+                "Baseline", _format_number(baseline_number, digits=6), None, "neutral"
+            )
         with f2:
-            render_metric_card("Encoded plaintext", _format_number(encoded_number, digits=6))
+            render_metric_card(
+                "Encoded plaintext", _format_number(encoded_number, digits=6), None, "neutral"
+            )
         with f3:
-            render_metric_card("PHE prediction", _format_number(secure_number, digits=6))
+            render_metric_card(
+                "PHE prediction", _format_number(secure_number, digits=6), None, "neutral"
+            )
         with f4:
-            render_metric_card("Tolerance", _format_number(tolerance, digits=6))
+            render_metric_card("Tolerance", _format_number(tolerance, digits=6), None, "neutral")
         f5, f6, f7, f8 = st.columns(4)
         with f5:
             render_metric_card(
-                "Δ encoded vs baseline", _format_number(delta_encoded_baseline, digits=6)
+                "Δ encoded vs baseline",
+                _format_number(delta_encoded_baseline, digits=6),
+                None,
+                "neutral",
             )
         with f6:
-            render_metric_card("Δ PHE vs baseline", _format_number(delta_secure_baseline, digits=6))
+            render_metric_card(
+                "Δ PHE vs baseline",
+                _format_number(delta_secure_baseline, digits=6),
+                None,
+                "neutral",
+            )
         with f7:
-            render_metric_card("Δ PHE vs encoded", _format_number(delta_secure_encoded, digits=6))
+            render_metric_card(
+                "Δ PHE vs encoded", _format_number(delta_secure_encoded, digits=6), None, "neutral"
+            )
         with f8:
-            render_metric_card("Запас до tolerance", _format_number(margin, digits=6))
+            render_metric_card(
+                "Запас до tolerance", _format_number(margin, digits=6), None, "neutral"
+            )
 
     with st.container(border=True):
         st.subheader("3. Конфиденциальность и накладные расходы")
         p1, p2, p3, p4 = st.columns(4)
         with p1:
-            render_metric_card("Сервер видит исходные признаки", "НЕТ")
+            render_metric_card("Сервер видит исходные признаки", "НЕТ", None, "neutral")
         with p2:
-            render_metric_card("Закрытый ключ передан серверу", "НЕТ")
+            render_metric_card("Закрытый ключ передан серверу", "НЕТ", None, "neutral")
         with p3:
-            render_metric_card("Запрос зашифрован", "ДА")
+            render_metric_card("Запрос зашифрован", "ДА", None, "neutral")
         with p4:
             render_metric_card(
                 "Overhead ratio",
                 f"{_to_float(result.get('overhead_ratio')):.2f}x"
                 if _to_float(result.get("overhead_ratio")) is not None
                 else "—",
+                None,
+                "neutral",
             )
         p5, p6, p7, p8 = st.columns(4)
         with p5:
             render_metric_card(
-                "Plaintext request size", _format_bytes(result.get("plaintext_bytes"))
+                "Plaintext request size",
+                _format_bytes(result.get("plaintext_bytes")),
+                None,
+                "neutral",
             )
         with p6:
             render_metric_card(
-                "Encrypted request size", _format_bytes(result.get("encrypted_bytes"))
+                "Encrypted request size",
+                _format_bytes(result.get("encrypted_bytes")),
+                None,
+                "neutral",
             )
         with p7:
-            render_metric_card("Encryption time", _format_ms(result.get("encrypt_ms")))
+            render_metric_card(
+                "Encryption time", _format_ms(result.get("encrypt_ms")), None, "neutral"
+            )
         with p8:
-            render_metric_card("Server compute time", _format_ms(result.get("server_compute_ms")))
+            render_metric_card(
+                "Server compute time", _format_ms(result.get("server_compute_ms")), None, "neutral"
+            )
         p9, p10 = st.columns(2)
         with p9:
-            render_metric_card("Decryption time", _format_ms(result.get("decrypt_ms")))
+            render_metric_card(
+                "Decryption time", _format_ms(result.get("decrypt_ms")), None, "neutral"
+            )
         with p10:
-            render_metric_card("HTTP roundtrip", _format_ms(result.get("http_elapsed_ms")))
+            render_metric_card(
+                "HTTP roundtrip", _format_ms(result.get("http_elapsed_ms")), None, "neutral"
+            )
 
 
 def _regression_quality_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
@@ -516,26 +567,36 @@ def render_aggregate_regression_metrics() -> None:
         render_metric_card(
             "Mean |PHE − baseline|",
             _format_number(details["mean_abs_diff_phe_baseline"], digits=6),
+            None,
+            "neutral",
         )
     with c2:
         render_metric_card(
             "Max |PHE − baseline|",
             _format_number(details["max_abs_diff_phe_baseline"], digits=6),
+            None,
+            "neutral",
         )
     with c3:
         render_metric_card(
             "Mean |PHE − encoded|",
             _format_number(details["mean_abs_diff_phe_encoded"], digits=6),
+            None,
+            "neutral",
         )
     with c4:
         render_metric_card(
             "Max |PHE − encoded|",
             _format_number(details["max_abs_diff_phe_encoded"], digits=6),
+            None,
+            "neutral",
         )
     with c5:
         render_metric_card(
             "Match rate @ 1e-2",
             f"{details['match_rate_tol_1e_2']:.2%}",
+            None,
+            "neutral",
         )
 
 
