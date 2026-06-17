@@ -69,10 +69,23 @@ def _active(step: int, zone: str) -> bool:
     )
 
 
+ACTIVE_NOTES = {
+    (1, "client"): "Масштабирование выполняется на клиенте",
+    (2, "client"): "Кодирование выполняется на клиенте",
+    (3, "client"): "Клиент шифрует признаки",
+    (4, "channel"): "Зашифрованный запрос передаётся серверу",
+    (5, "server"): "Сервер выполняет гомоморфное вычисление",
+    (5, "channel"): "Зашифрованный результат возвращается клиенту",
+    (6, "client"): "Клиент расшифровывает результат",
+}
+
+
 def _active_note(step: int, zone: str) -> None:
-    if _active(step, zone):
+    note = ACTIVE_NOTES.get((step, zone))
+    if note:
         st.markdown(
-            "<div class='active-zone'>Сейчас выполняется здесь</div>", unsafe_allow_html=True
+            f"<div class='active-zone active-zone-{zone}'>{note}</div>",
+            unsafe_allow_html=True,
         )
 
 

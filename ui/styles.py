@@ -37,7 +37,10 @@ LOCAL_CSS = f"""
 div[data-testid="stVerticalBlockBorderWrapper"]:has(div[data-testid="stVerticalBlock"][data-st-key="client_zone"]) {{ background:{PALETTE["client_bg"]}; border-color:{PALETTE["client"]}; }}
 div[data-testid="stVerticalBlockBorderWrapper"]:has(div[data-testid="stVerticalBlock"][data-st-key="channel_zone"]) {{ background:{PALETTE["transport_bg"]}; border-color:#94a3b8; }}
 div[data-testid="stVerticalBlockBorderWrapper"]:has(div[data-testid="stVerticalBlock"][data-st-key="server_zone"]) {{ background:{PALETTE["server_bg"]}; border-color:{PALETTE["server"]}; }}
-.active-zone {{ border:2px solid {PALETTE["blue"]}; box-shadow:0 8px 20px rgba(37,99,235,.12); border-radius:.75rem; padding:.35rem; margin-bottom:.35rem; font-weight:700; color:{PALETTE["blue"]}; }}
+.active-zone {{ border:2px solid currentColor; box-shadow:0 8px 20px rgba(15,23,42,.10); border-radius:.75rem; padding:.35rem; margin-bottom:.35rem; font-weight:700; }}
+.active-zone-client {{ background:#fff1ed; color:{PALETTE["client"]}; box-shadow:0 8px 20px rgba(249,115,96,.14); }}
+.active-zone-channel {{ background:#eff6ff; color:{PALETTE["blue"]}; box-shadow:0 8px 20px rgba(37,99,235,.14); }}
+.active-zone-server {{ background:#ecfdf5; color:{PALETTE["server"]}; box-shadow:0 8px 20px rgba(34,160,107,.14); }}
 .channel-arrow {{ text-align:center; font-weight:800; font-size:1.05rem; margin:.4rem 0; color:{PALETTE["text"]}; white-space:nowrap; }}
 .metric-card-header {{ display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem; margin-bottom:.45rem; }}
 .metric-card-title {{ color:{PALETTE["text"]}; font-size:.82rem; font-weight:700; }}
