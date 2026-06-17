@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 from typing import Any
 
 import numpy as np
@@ -13,6 +14,39 @@ from app.crypto import serialize_ciphertext
 from ui.components import render_arrow, render_card, render_compact_kpi, render_operation_card
 from ui.metrics_helpers import format_class_label
 from ui.styles import PALETTE
+
+FEATURE_LABELS: dict[str, str] = {
+    # Breast Cancer Wisconsin features
+    "mean radius": "средний радиус",
+    "mean texture": "средняя текстура",
+    "mean perimeter": "средний периметр",
+    "mean area": "средняя площадь",
+    "mean smoothness": "средняя гладкость",
+    "mean compactness": "средняя компактность",
+    "mean concavity": "средняя вогнутость",
+    "mean concave points": "среднее число вогнутых точек",
+    "mean symmetry": "средняя симметрия",
+    "mean fractal dimension": "средняя фрактальная размерность",
+    "radius error": "ошибка радиуса",
+    "texture error": "ошибка текстуры",
+    "worst radius": "наибольший радиус",
+    "worst texture": "наибольшая текстура",
+    # Diabetes features from sklearn.datasets.load_diabetes
+    "age": "возраст пациента",
+    "sex": "пол пациента",
+    "bmi": "индекс массы тела",
+    "bp": "среднее артериальное давление",
+    "s1": "общий холестерин",
+    "s2": "липопротеины низкой плотности",
+    "s3": "липопротеины высокой плотности",
+    "s4": "отношение общего холестерина к ЛПВП",
+    "s5": "логарифм уровня триглицеридов",
+    "s6": "уровень глюкозы в крови",
+}
+
+
+def _feature_label(name: str) -> str:
+    return FEATURE_LABELS.get(name, name)
 
 
 def _preview(value: Any, chars: int = 48) -> str:
@@ -48,7 +82,7 @@ def _fmt(value: Any, digits: int = 2) -> str:
 
 def _feature_example(
     sample: pd.Series, scenario: dict[str, Any], result: dict[str, Any]
-) -> tuple[str, str, str, str, str] | None:
+) -> tuple[str, str, str, str, str, str] | None:
     scaler = scenario.get("scaler")
     if scaler is None or not all(hasattr(scaler, attr) for attr in ("mean_", "scale_")):
         return None
@@ -58,7 +92,7 @@ def _feature_example(
     mean = float(scaler.mean_[idx])
     sigma = float(scaler.scale_[idx])
     scaled = float(result.get("x_scaled", np.array([(raw - mean) / sigma]))[idx])
-    return name, _fmt(raw), _fmt(mean), _fmt(sigma), _fmt(scaled)
+    return name, _feature_label(name), _fmt(raw), _fmt(mean), _fmt(sigma), _fmt(scaled)
 
 
 def _active(step: int, zone: str) -> bool:
@@ -151,11 +185,17 @@ def render_protocol_exchange_layout(
         def render_scaling_step(*, show_table: bool) -> None:
             if not ex:
                 return
-            name, raw, mean, sigma, scaled = ex
+            technical_name, readable_label, raw, mean, sigma, scaled = ex
+            example_html = (
+                f"<div class='operation-example-feature'>Признак: {html.escape(readable_label)}</div>"
+                f"<div class='operation-example-technical'>{html.escape(technical_name)}</div>"
+                f"<div>({raw} − {mean}) / {sigma} = {scaled}</div>"
+            )
             render_operation_card(
                 "Масштабирование признаков",
                 "x' = (x − μ) / σ",
-                f"{name}: ({raw} − {mean}) / {sigma} = {scaled}",
+                example_html,
+                example_is_html=True,
             )
             st.write(f"Обработано признаков: {len(sample)}")
             if show_table:

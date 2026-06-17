@@ -56,6 +56,8 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(div[data-testid="stVerticalB
 .status-banner.red {{ background:#fce8e6; color:#a50e0e; }}
 .operation-card code {{ display:block; margin:.35rem 0; background:#f1f5f9; padding:.35rem; border-radius:.35rem; }}
 .operation-example {{ font-size:.86rem; color:#334155; }}
+.operation-example-feature {{ font-weight:700; color:{PALETTE["text"]}; }}
+.operation-example-technical {{ font-size:.74rem; color:#64748b; margin:.1rem 0 .25rem; }}
 </style>
 """
 

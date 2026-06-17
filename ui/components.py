@@ -141,9 +141,16 @@ def render_status_banner(text: str, status: Literal["green", "yellow", "red"]) -
     )
 
 
-def render_operation_card(title: str, formula: str, example: str | None = None) -> None:
+def render_operation_card(
+    title: str, formula: str, example: str | None = None, *, example_is_html: bool = False
+) -> None:
     """Render current operation with one formula and optional substitution."""
-    example_html = f"<div class='operation-example'>{html.escape(example)}</div>" if example else ""
+    if example and example_is_html:
+        example_html = f"<div class='operation-example'>{example}</div>"
+    else:
+        example_html = (
+            f"<div class='operation-example'>{html.escape(example)}</div>" if example else ""
+        )
     st.markdown(
         f"<div class='operation-card'><strong>{html.escape(title)}</strong>"
         f"<code>{html.escape(formula)}</code>{example_html}</div>",
