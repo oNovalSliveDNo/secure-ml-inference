@@ -131,7 +131,7 @@ def render_protocol_exchange_layout(
     detailed: bool = False,
 ) -> None:
     """Render compact client, channel, and server protocol zones."""
-    client_col, channel_col, server_col = st.columns([4.7, 1.2, 4.7])
+    client_col, channel_col, server_col = st.columns([4.4, 1.6, 4.4])
     feature_names = [str(name) for name in sample.index]
 
     server_data = build_server_panel_data(
@@ -259,23 +259,34 @@ def render_protocol_exchange_layout(
     with channel_col, st.container(key="channel_zone", border=True):
         _active_note(current_step, "channel")
         st.markdown("**Канал передачи**")
+        request_size = result.get("encrypted_bytes")
+        status_code = result.get("status_code")
         if current_step < 4:
             st.caption("Ожидание")
+            st.caption("Запрос ещё не сформирован")
         elif current_step == 4:
-            st.markdown(
-                "<div class='channel-arrow'>КЛИЕНТ ─────> СЕРВЕР</div>", unsafe_allow_html=True
-            )
-            st.markdown(
-                f"Передаются:<br>• открытый ключ;<br>• {len(sample)} зашифрованных признаков;<br>• служебные параметры.",
-                unsafe_allow_html=True,
-            )
+            st.markdown("<div class='channel-arrow'>КЛИЕНТ → СЕРВЕР</div>", unsafe_allow_html=True)
+            st.write("Enc(x)")
+            st.write(f"{len(sample)} значений")
+            st.caption(f"Размер запроса: {request_size if request_size is not None else '—'} байт")
+            with st.expander("Технические подробности", expanded=detailed):
+                st.write("Открытый ключ передаётся вместе с запросом")
+                st.write("Служебные параметры включены в payload")
+                st.write(f"HTTP: {status_code if status_code is not None else '—'}")
         else:
-            st.markdown(
-                "<div class='channel-arrow'>КЛИЕНТ <───── СЕРВЕР</div>", unsafe_allow_html=True
-            )
-            st.write("Возвращается один зашифрованный результат Enc(z)")
-        st.caption(f"Размер запроса: {result.get('encrypted_bytes', '—')} байт")
-        st.caption(f"HTTP: {result.get('status_code', '—')}")
+            st.markdown("<div class='channel-arrow'>КЛИЕНТ ← СЕРВЕР</div>", unsafe_allow_html=True)
+            st.write("Enc(z)")
+            st.write("1 значение")
+            if status_code == 200:
+                st.caption("Запрос успешно обработан")
+            else:
+                st.caption(f"HTTP: {status_code if status_code is not None else '—'}")
+            with st.expander("Технические подробности", expanded=detailed):
+                st.write(
+                    f"Размер запроса: {request_size if request_size is not None else '—'} байт"
+                )
+                st.write("Ответ содержит один зашифрованный результат")
+                st.write(f"HTTP: {status_code if status_code is not None else '—'}")
 
     with server_col, st.container(key="server_zone", border=True):
         _active_note(current_step, "server")
