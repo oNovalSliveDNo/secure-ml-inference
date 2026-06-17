@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 ScenarioId = Literal["classification", "regression"]
 TaskType = Literal["classification", "regression"]
+StatusLevel = Literal["off", "normal", "warning", "critical"]
 
 
 class TransportMetadata(TypedDict, total=False):
@@ -23,6 +24,9 @@ class TransportMetadata(TypedDict, total=False):
     status_code: int
     server_compute_ms: float | None
     http_elapsed_ms: float
+    plaintext_bytes: int
+    encrypted_bytes: int
+    overhead_ratio: float
 
 
 @dataclass(slots=True)
@@ -65,6 +69,31 @@ class ProtocolTrace:
 
 
 @dataclass(slots=True)
+class RegressionErrorDistribution:
+    """Baseline absolute-error distribution for a regression dataset."""
+
+    median_abs_error: float | None
+    p90_abs_error: float | None
+    abs_errors: list[float] = field(default_factory=list)
+    sample_count: int = 0
+
+
+@dataclass(slots=True)
+class SampleRegressionMetrics:
+    """Regression quality metrics for one selected sample."""
+
+    true_value: float | None
+    baseline_prediction: float | None
+    abs_error: float | None
+    relative_error: float | None
+    error_percentile: float | None
+    median_abs_error: float | None
+    p90_abs_error: float | None
+    status_label: str
+    status_level: StatusLevel
+
+
+@dataclass(slots=True)
 class SampleMetrics:
     """Metrics calculated for a single selected sample."""
 
@@ -79,9 +108,18 @@ class SampleMetrics:
 
 @dataclass(slots=True)
 class FidelityMetrics:
-    """Aggregate fidelity metrics from experiment result tables."""
+    """Sample-level parity metrics for baseline, encoded, and PHE predictions."""
 
-    metric_name: str
-    value: float
+    baseline_prediction: float | None
+    encoded_prediction: float | None
+    phe_prediction: float | None
+    delta_encoded_baseline: float | None
+    delta_phe_baseline: float | None
+    delta_phe_encoded: float | None
+    max_delta: float | None
+    tolerance: float | None
+    margin: float | None
+    status_label: str
+    status_level: StatusLevel
     scenario: str | None = None
     mode: str | None = None

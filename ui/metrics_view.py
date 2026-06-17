@@ -11,8 +11,11 @@ import pandas as pd
 import streamlit as st
 
 from ui.components import render_metric_card
-
-DEFAULT_FIDELITY_TOLERANCE = 0.01
+from ui.metrics_helpers import (
+    DEFAULT_FIDELITY_TOLERANCE,
+    classify_fidelity_status,
+    classify_sample_error_status,
+)
 
 
 def _to_float(value: Any) -> float | None:
@@ -47,28 +50,6 @@ def _format_ms(value: Any) -> str:
     if number is None:
         return "—"
     return f"{number:.2f} мс"
-
-
-def classify_sample_error_status(
-    abs_error: float | None, median_abs_error: float | None, p90_abs_error: float | None
-) -> tuple[str, str]:
-    """Classify selected regression-sample baseline error against baseline-error distribution."""
-    if abs_error is None or median_abs_error is None or p90_abs_error is None:
-        return "Недостаточно данных", "off"
-    if abs_error <= median_abs_error:
-        return "Ошибка не выше медианной", "normal"
-    if abs_error <= p90_abs_error:
-        return "Ошибка между медианой и p90", "warning"
-    return "Ошибка выше p90", "critical"
-
-
-def classify_fidelity_status(max_delta: float | None, tolerance: float | None) -> tuple[str, str]:
-    """Classify encoding/PHE fidelity against a numeric tolerance."""
-    if max_delta is None or tolerance is None:
-        return "Недостаточно данных", "off"
-    if max_delta <= tolerance:
-        return "В пределах допуска", "normal"
-    return "Выше допуска", "critical"
 
 
 def _render_status(label: str, status: tuple[str, str]) -> None:
@@ -324,7 +305,7 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
         ]
         max_delta = max(deltas) if deltas else None
         margin = tolerance - max_delta if tolerance is not None and max_delta is not None else None
-        _render_status("Статус fidelity", classify_fidelity_status(max_delta, tolerance))
+        _render_status("Статус fidelity", classify_fidelity_status(delta_secure_baseline))
         f1, f2, f3, f4 = st.columns(4)
         with f1:
             render_metric_card("Baseline", _format_number(baseline_number, digits=6))
