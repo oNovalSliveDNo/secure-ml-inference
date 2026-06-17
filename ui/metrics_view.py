@@ -29,7 +29,6 @@ from ui.metrics_helpers import (
 from ui.model_labels import get_model_label
 
 
-
 def _to_float(value: Any) -> float | None:
     """Convert a value to float when possible."""
     if value is None:
@@ -41,11 +40,11 @@ def _to_float(value: Any) -> float | None:
 
 
 def _format_number(value: Any, digits: int = 6) -> str:
-    """Format a numeric value for compact metric display."""
+    """Format a numeric value with Russian decimal and thousands separators."""
     number = _to_float(value)
     if number is None:
         return "—"
-    return f"{number:.{digits}f}"
+    return f"{number:,.{digits}f}".replace(",", " ").replace(".", ",")
 
 
 def _format_bytes(value: Any) -> str:
@@ -53,7 +52,15 @@ def _format_bytes(value: Any) -> str:
     number = _to_float(value)
     if number is None:
         return "—"
-    return f"{int(number)} байт"
+    byte_count = int(number)
+    abs_count = abs(byte_count)
+    if abs_count % 10 == 1 and abs_count % 100 != 11:
+        unit = "байт"
+    elif 2 <= abs_count % 10 <= 4 and not 12 <= abs_count % 100 <= 14:
+        unit = "байта"
+    else:
+        unit = "байт"
+    return f"{byte_count:,}".replace(",", " ") + f" {unit}"
 
 
 def _format_ms(value: Any) -> str:
@@ -61,7 +68,24 @@ def _format_ms(value: Any) -> str:
     number = _to_float(value)
     if number is None:
         return "—"
-    return f"{number:.2f} мс"
+    return f"{number:,.2f}".replace(",", " ").replace(".", ",") + " мс"
+
+
+def _format_percent(value: Any, digits: int = 2) -> str:
+    """Format a ratio as a localized percentage."""
+    number = _to_float(value)
+    if number is None:
+        return "—"
+    return _format_number(number * 100, digits) + "%"
+
+
+def _format_signed_number(value: Any, digits: int = 6) -> str:
+    """Format a signed numeric value with localized separators."""
+    number = _to_float(value)
+    if number is None:
+        return "—"
+    sign = "+" if number >= 0 else "-"
+    return sign + _format_number(abs(number), digits)
 
 
 def _render_status(label: str, status: tuple[str, str]) -> None:
@@ -270,10 +294,10 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
                 st.write(f"Медианная абсолютная ошибка: {_format_number(median_abs_error, 4)}")
                 st.write(f"90-й процентиль ошибки: {_format_number(p90_abs_error, 4)}")
                 st.write(
-                    f"Относительная ошибка: {'—' if relative_error is None else f'{relative_error:.2%}'}"
+                    f"Относительная ошибка: {'—' if relative_error is None else _format_percent(relative_error, 2)}"
                 )
                 st.write(
-                    f"Положение ошибки среди тестовых объектов: {'—' if error_percentile is None else f'{error_percentile:.1f}%'}"
+                    f"Положение ошибки среди тестовых объектов: {'—' if error_percentile is None else _format_number(error_percentile, 1) + '%'}"
                 )
 
     fidelity_baseline_value = (
@@ -318,13 +342,13 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
     with f_col, st.container(border=True):
         st.subheader("Влияние защиты")
         if scenario_id == "classification":
-            st.write(f"Вероятность без защиты: **{_format_number(baseline_number, 6)}**")
+            st.write(f"Вероятность без защиты: **{_format_number(baseline_number, 4)}**")
             st.write(f"Защищённое предсказание: **{format_class_label(secure_value)}**")
-            st.write(f"Вероятность в защищённом режиме: **{_format_number(secure_number, 6)}**")
+            st.write(f"Вероятность в защищённом режиме: **{_format_number(secure_number, 4)}**")
             st.write(f"Отклонение вероятности: **{_format_number(delta_secure_baseline, 6)}**")
         else:
-            st.write(f"Обычный прогноз: **{_format_number(baseline_number, 6)}**")
-            st.write(f"Защищённый прогноз: **{_format_number(secure_number, 6)}**")
+            st.write(f"Обычный прогноз: **{_format_number(baseline_number, 4)}**")
+            st.write(f"Защищённый прогноз: **{_format_number(secure_number, 4)}**")
             st.write(f"Отклонение прогноза: **{_format_number(delta_secure_baseline, 6)}**")
         render_status_banner(
             f"✓ Отклонение {_format_number(delta_secure_baseline, 6)} меньше допуска {_format_number(tolerance, 2)}"
@@ -337,9 +361,9 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
                 encoded_class = result.get("pred_encoded")
                 encoded_class_text = format_class_label(encoded_class)
                 st.write(
-                    f"Линейный результат после кодирования z: {_format_number(encoded_value, 6)}"
+                    f"Линейный результат после кодирования z: {_format_number(encoded_value, 4)}"
                 )
-                st.write(f"Вероятность после кодирования: {_format_number(encoded_number, 6)}")
+                st.write(f"Вероятность после кодирования: {_format_number(encoded_number, 4)}")
                 st.write(f"Класс после кодирования: {encoded_class_text}")
                 st.write(f"Класс защищённого режима: {format_class_label(secure_value)}")
                 st.write(
@@ -349,7 +373,7 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
                     f"Δ защищённая вероятность относительно кодирования: {_format_number(delta_secure_encoded, 6)}"
                 )
             else:
-                st.write(f"Расчёт после кодирования: {_format_number(encoded_number, 6)}")
+                st.write(f"Расчёт после кодирования: {_format_number(encoded_number, 4)}")
                 st.write(
                     f"Δ кодирование относительно обычного: {_format_number(delta_encoded_baseline, 6)}"
                 )
@@ -370,7 +394,9 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
                 f"Размер зашифрованного запроса: {_format_bytes(result.get('encrypted_bytes'))}"
             )
             ratio = _to_float(result.get("overhead_ratio"))
-            st.write(f"Увеличение размера: {'—' if ratio is None else f'{ratio:.2f}x'}")
+            st.write(
+                f"Увеличение размера: {'—' if ratio is None else _format_number(ratio, 2) + 'x'}"
+            )
             st.write(f"Время шифрования: {_format_ms(result.get('encrypt_ms'))}")
             st.write(f"Время вычисления на сервере: {_format_ms(result.get('server_compute_ms'))}")
             st.write(f"Время расшифрования: {_format_ms(result.get('decrypt_ms'))}")
@@ -527,10 +553,10 @@ def render_aggregate_regression_metrics() -> None:
 
     styled_metrics = metrics_df.style.format(
         {
-            "Обычная модель": "{:.6f}",
-            "После кодирования": "{:.6f}",
-            "PHE": "{:.6f}",
-            "Δ PHE относительно baseline": "{:+.6f}",
+            "Обычная модель": lambda value: _format_number(value, 4),
+            "После кодирования": lambda value: _format_number(value, 4),
+            "PHE": lambda value: _format_number(value, 4),
+            "Δ PHE относительно baseline": lambda value: _format_signed_number(value, 6),
         }
     ).map(_style_quality_delta, subset=["Δ PHE относительно baseline"])
     st.dataframe(styled_metrics, width="stretch", hide_index=True)
@@ -567,7 +593,7 @@ def render_aggregate_regression_metrics() -> None:
     with c5:
         render_metric_card(
             "Match rate @ 1e-2",
-            f"{details['match_rate_tol_1e_2']:.2%}",
+            _format_percent(details["match_rate_tol_1e_2"], 2),
             None,
             "neutral",
         )
@@ -583,10 +609,10 @@ def render_compact_aggregate_regression_summary() -> None:
     values = metrics_df.set_index("Метрика")
     st.info(
         "По всей тестовой выборке: "
-        f"MAE {values.loc['MAE', 'PHE']:.2f} | "
-        f"RMSE {values.loc['RMSE', 'PHE']:.2f} | "
-        f"R² {values.loc['R²', 'PHE']:.3f} | "
-        f"среднее Δ PHE {details['mean_abs_diff_phe_baseline']:.6f}\n\n"
+        f"MAE {_format_number(values.loc['MAE', 'PHE'], 2)} | "
+        f"RMSE {_format_number(values.loc['RMSE', 'PHE'], 2)} | "
+        f"R² {_format_number(values.loc['R²', 'PHE'], 3)} | "
+        f"среднее Δ PHE {_format_number(details['mean_abs_diff_phe_baseline'], 6)}\n\n"
         "Подробные результаты находятся во вкладке «Результаты экспериментов»."
     )
 
@@ -620,11 +646,13 @@ def show_metrics_dashboard(tables_dir: Path, plots_dir: Path) -> None:
             if totals.get("total") is not None and totals.get("total_without_keygen") is not None:
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.metric("Общее время с генерацией ключей, мс", f"{totals['total']:.2f}")
+                    st.metric(
+                        "Общее время с генерацией ключей, мс", _format_number(totals["total"], 2)
+                    )
                 with col2:
                     st.metric(
                         "Общее время без генерации ключей, мс",
-                        f"{totals['total_without_keygen']:.2f}",
+                        _format_number(totals["total_without_keygen"], 2),
                     )
         st.markdown(f"**Интерпретация:** {_get_table_explanation(csv_file.name, df)}")
     if not plot_files:

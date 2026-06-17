@@ -76,9 +76,31 @@ def _ciphertext_preview(value: Any, chars: int = 64) -> str:
 
 def _fmt(value: Any, digits: int = 2) -> str:
     try:
-        return f"{float(value):.{digits}f}".replace(".", ",")
+        return f"{float(value):,.{digits}f}".replace(",", " ").replace(".", ",")
     except (TypeError, ValueError):
         return "—"
+
+
+def _fmt_int(value: Any) -> str:
+    try:
+        return f"{int(value):,}".replace(",", " ")
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _fmt_bytes(value: Any) -> str:
+    try:
+        byte_count = int(value)
+    except (TypeError, ValueError):
+        return "—"
+    abs_count = abs(byte_count)
+    if abs_count % 10 == 1 and abs_count % 100 != 11:
+        unit = "байт"
+    elif 2 <= abs_count % 10 <= 4 and not 12 <= abs_count % 100 <= 14:
+        unit = "байта"
+    else:
+        unit = "байт"
+    return f"{byte_count:,}".replace(",", " ") + f" {unit}"
 
 
 def _feature_example(
@@ -223,9 +245,9 @@ def render_protocol_exchange_layout(
             render_operation_card(
                 "Кодирование с фиксированной точкой",
                 "x_int = round(x' × S)",
-                f"{_fmt(scaled_value)} × {scale:,} → {value}".replace(",", " "),
+                f"{_fmt(scaled_value)} × {_fmt_int(scale)} → {_fmt_int(value)}",
             )
-            st.write(f"Масштаб S: {scale:,}".replace(",", " "))
+            st.write(f"Масштаб S: {_fmt_int(scale)}")
             st.write(f"Закодировано значений: {len(result['x_int'])}")
             if show_table:
                 with st.expander("Технические подробности кодирования", expanded=detailed):
@@ -270,7 +292,7 @@ def render_protocol_exchange_layout(
             if "z_secure" not in result:
                 return
             render_operation_card("Результат получен и расшифрован", "z = Dec_sk(Enc(z_int)) / S²")
-            st.write(f"Расшифрованное целое значение: `{result['score_int']}`")
+            st.write(f"Расшифрованное целое значение: `{_fmt_int(result['score_int'])}`")
             st.write(f"Итоговый прогноз: `{_fmt(result['z_secure'], 6)}`")
             if scenario_id == "classification":
                 st.write(f"Вероятность класса: `{_fmt(result.get('prob_secure'), 4)}`")
@@ -312,7 +334,7 @@ def render_protocol_exchange_layout(
             st.markdown("<div class='channel-arrow'>КЛИЕНТ → СЕРВЕР</div>", unsafe_allow_html=True)
             st.write("Enc(x)")
             st.write(f"{len(sample)} значений")
-            st.caption(f"Размер запроса: {request_size if request_size is not None else '—'} байт")
+            st.caption(f"Размер запроса: {_fmt_bytes(request_size)}")
             with st.expander("Технические подробности", expanded=detailed):
                 st.write("Открытый ключ передаётся вместе с запросом")
                 st.write("Служебные параметры включены в payload")
@@ -326,9 +348,7 @@ def render_protocol_exchange_layout(
             else:
                 st.caption(f"HTTP: {status_code if status_code is not None else '—'}")
             with st.expander("Технические подробности", expanded=detailed):
-                st.write(
-                    f"Размер запроса: {request_size if request_size is not None else '—'} байт"
-                )
+                st.write(f"Размер запроса: {_fmt_bytes(request_size)}")
                 st.write("Ответ содержит один зашифрованный результат")
                 st.write(f"HTTP: {status_code if status_code is not None else '—'}")
 
@@ -340,7 +360,7 @@ def render_protocol_exchange_layout(
         st.write(f"Модель: {get_model_label(scenario_id)}")
         st.caption(get_model_technical_name(scenario_id))
         st.write(f"Коэффициентов: {server_data['coefficient_count']}")
-        st.write(f"Масштаб кодирования: {scale:,}".replace(",", " "))
+        st.write(f"Масштаб кодирования: {_fmt_int(scale)}")
         if current_step >= 4:
             st.write(f"Получено зашифрованных признаков: {server_data['feature_count']}")
             st.write("Открытые значения признаков: недоступны")
