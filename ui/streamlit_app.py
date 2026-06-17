@@ -21,6 +21,12 @@ from app.data import load_dataset, split_dataset
 from app.encoding import decode_score, encoded_plaintext_score
 from app.metrics import measure_payload_size
 from app.model import extract_linear_params, load_model
+from ui.calculation_trace import render_calculation_trace
+from ui.components import render_step_statuses
+from ui.metrics_view import render_sample_level_metrics, show_metrics_dashboard
+from ui.protocol_view import show_architecture
+from ui.styles import apply_styles
+from ui.ui_models import ProtocolState
 
 st.set_page_config(page_title="Защищённое предсказание модели — демонстрация", layout="wide")
 
@@ -38,150 +44,6 @@ def _extract_server_compute_ms(payload: dict[str, Any]) -> float | None:
         if isinstance(value, (int, float)):
             return float(value)
     return None
-
-
-def _get_table_explanation(csv_name: str, df: pd.DataFrame) -> str:
-    """Return a concise Russian explanation for metrics table."""
-    lower_name = csv_name.lower()
-    numeric_df = df.select_dtypes(include="number")
-
-    if "accuracy" in lower_name or "acc" in lower_name:
-        if numeric_df.shape[1] >= 2:
-            delta = abs(float(numeric_df.iloc[:, 0].mean()) - float(numeric_df.iloc[:, 1].mean()))
-            if delta < 1e-6:
-                return "Точность модели не изменилась при переходе к защищённому режиму."
-        return "Таблица показывает, что качество обычного и защищённого расчёта сопоставимо."
-
-    if "latency" in lower_name or "time" in lower_name or "timing" in lower_name:
-        return "Таблица показывает, сколько времени занимает каждый этап работы системы."
-
-    if "overhead" in lower_name or "payload" in lower_name:
-        return "Таблица показывает, насколько увеличивается объём передаваемых данных из-за шифрования."
-
-    if not numeric_df.empty:
-        return "Таблица содержит численные результаты экспериментов."
-    return "Таблица содержит дополнительные сведения по экспериментам."
-
-
-def _get_plot_explanation(plot_name: str) -> str:
-    """Return a concise Russian explanation for plot."""
-    lower_name = plot_name.lower()
-    if "latency" in lower_name or "time" in lower_name or "timing" in lower_name:
-        return "График показывает, как меняется время работы системы при увеличении нагрузки."
-    if "feature" in lower_name or "dim" in lower_name:
-        return "График показывает, как число признаков влияет на время работы и размер данных."
-    if "accuracy" in lower_name or "auc" in lower_name:
-        return "График показывает, что качество модели сохраняется в защищённом режиме."
-    if "payload" in lower_name or "size" in lower_name or "overhead" in lower_name:
-        return "График показывает рост объёма передаваемых данных из-за шифрования."
-    return "График показывает экспериментальные результаты в наглядном виде."
-
-
-def _get_artifact_title(file_name: str) -> str:
-    """Return a readable Russian title for result files."""
-    lower_name = file_name.lower()
-    title_by_keyword = {
-        "quality": "качество предсказаний",
-        "accuracy": "качество предсказаний",
-        "latency": "время выполнения",
-        "time": "время выполнения",
-        "payload": "размер передаваемых данных",
-        "overhead": "дополнительные затраты",
-        "feature": "влияние числа признаков",
-        "dataset": "сравнение наборов данных",
-        "key": "влияние длины ключа",
-        "scale": "влияние масштаба кодирования",
-        "roundtrip": "полный запрос через сервер",
-        "regression": "результаты регрессии",
-        "classification": "результаты классификации",
-    }
-    for keyword, title in title_by_keyword.items():
-        if keyword in lower_name:
-            return title
-    return file_name
-
-
-_COLUMN_TRANSLATIONS = {
-    "method": "Метод",
-    "mode": "Режим",
-    "scenario": "Тип задачи",
-    "task": "Тип задачи",
-    "dataset": "Набор данных",
-    "stage": "Этап",
-    "metric": "Метрика",
-    "value": "Значение",
-    "mean": "Среднее значение",
-    "std": "Стандартное отклонение",
-    "min": "Минимум",
-    "max": "Максимум",
-    "mean_ms": "Среднее время, мс",
-    "std_ms": "Отклонение, мс",
-    "median_ms": "Медианное время, мс",
-    "total_ms": "Общее время, мс",
-    "encryption_ms": "Время шифрования, мс",
-    "decryption_ms": "Время расшифровки, мс",
-    "server_compute_ms": "Время расчёта на сервере, мс",
-    "http_elapsed_ms": "Полное время запроса, мс",
-    "accuracy": "Доля верных ответов",
-    "precision": "Точность положительного класса",
-    "recall": "Полнота",
-    "f1": "F1-мера",
-    "roc_auc": "ROC-AUC",
-    "match_rate": "Доля совпадений",
-    "mae": "Средняя абсолютная ошибка",
-    "mse": "Среднеквадратичная ошибка",
-    "rmse": "Корень из среднеквадратичной ошибки",
-    "r2": "Коэффициент детерминации R²",
-    "plaintext_bytes": "Размер обычного запроса, байт",
-    "encrypted_bytes": "Размер зашифрованного запроса, байт",
-    "payload_bytes": "Размер данных, байт",
-    "request_bytes": "Размер запроса, байт",
-    "response_bytes": "Размер ответа, байт",
-    "overhead_ratio": "Увеличение размера",
-    "feature_count": "Число признаков",
-    "key_length": "Длина ключа",
-    "scale": "Масштаб кодирования",
-    "sample_count": "Число объектов",
-}
-
-
-_VALUE_TRANSLATIONS = {
-    "baseline": "Обычная модель без защиты",
-    "plaintext": "Обычный расчёт",
-    "plaintext_baseline": "Обычная модель без защиты",
-    "encoded": "Открытый расчёт после кодирования",
-    "encoded_plaintext": "Открытый расчёт после кодирования",
-    "phe": "Защищённый расчёт",
-    "phe_inference": "Защищённый расчёт по зашифрованным данным",
-    "encrypted": "Зашифрованный режим",
-    "classification": "Классификация",
-    "regression": "Регрессия",
-    "keygen": "Генерация ключей",
-    "key_generation": "Генерация ключей",
-    "scaling": "Масштабирование признаков",
-    "encoding": "Кодирование признаков",
-    "encryption": "Шифрование признаков",
-    "server_compute": "Расчёт на сервере",
-    "decryption": "Расшифровка результата",
-    "postprocessing": "Получение итогового прогноза",
-    "total": "Общее время",
-    "total_without_keygen": "Общее время без генерации ключей",
-}
-
-
-def _prepare_display_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Translate common experiment table labels for the Streamlit page."""
-    display_df = df.copy()
-    display_df = display_df.rename(
-        columns={column: _COLUMN_TRANSLATIONS.get(column, column) for column in display_df.columns}
-    )
-
-    for column in display_df.select_dtypes(include="object").columns:
-        display_df[column] = display_df[column].map(
-            lambda value: _VALUE_TRANSLATIONS.get(value, value) if isinstance(value, str) else value
-        )
-
-    return display_df
 
 
 @st.cache_resource
@@ -285,33 +147,27 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
 
     st.session_state.setdefault(
         "demo_state",
-        {"scenario_id": scenario_id, "sample_idx": sample_idx, "step": 1, "result": {}},
+        ProtocolState(scenario_id=scenario_id, sample_idx=sample_idx).to_session_dict(),
     )
     if (
         st.session_state.demo_state["scenario_id"] != scenario_id
         or st.session_state.demo_state.get("sample_idx") != sample_idx
     ):
-        st.session_state.demo_state = {
-            "scenario_id": scenario_id,
-            "sample_idx": sample_idx,
-            "step": 1,
-            "result": {},
-        }
+        st.session_state.demo_state = ProtocolState(
+            scenario_id=scenario_id, sample_idx=sample_idx
+        ).to_session_dict()
 
     wizard_state: dict[str, Any] = st.session_state.demo_state
     result: dict[str, Any] = wizard_state["result"]
     current_step = wizard_state["step"]
 
     if st.button("Начать заново"):
-        st.session_state.demo_state = {
-            "scenario_id": scenario_id,
-            "step": 1,
-            "result": {},
-            "sample_idx": sample_idx,
-        }
+        st.session_state.demo_state = ProtocolState(
+            scenario_id=scenario_id, sample_idx=sample_idx
+        ).to_session_dict()
         st.rerun()
 
-    for idx, title in enumerate(
+    render_step_statuses(
         [
             "Шаг 1. Масштабирование",
             "Шаг 2. Кодирование",
@@ -321,10 +177,8 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             "Шаг 6. Постобработка и сравнение",
             "Шаг 7. Итоговая сводка",
         ],
-        start=1,
-    ):
-        marker = "🟢" if current_step == idx else ("✅" if current_step > idx else "⚪")
-        st.markdown(f"**{marker} {title}**")
+        current_step,
+    )
 
     if current_step >= 1:
         with st.expander("Шаг 1. Масштабирование", expanded=current_step == 1):
@@ -601,156 +455,13 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     if current_step >= 7 and "comparison_df" in result:
         st.subheader("Шаг 7. Итоговая сводка")
 
-    k1, k2, k3, k4, k5 = st.columns(5)
-    if "overhead_ratio" in result:
-        k1.metric("Сервер видит исходные признаки", "НЕТ")
-
-        if scenario_id == "classification":
-            match_label = (
-                "ДА" if result.get("pred_secure") == result.get("pred_baseline") else "НЕТ"
-            )
-            k2.metric("Совпадение с обычной моделью", match_label)
-        else:
-            delta_phe_baseline = abs(float(result["pred_secure"]) - float(result["pred_baseline"]))
-            match_label = "ДА" if delta_phe_baseline < 0.01 else "НЕТ"
-            k2.metric(
-                "Прогноз близок к обычной модели",
-                match_label,
-                delta=f"Δ = {delta_phe_baseline:.4f}",
-            )
-
-        k3.metric("Увеличение размера запроса", f"{result['overhead_ratio']:.2f}x")
-        k4.metric("Зашифрованный запрос", f"{result['encrypted_bytes']} байт")
-        k5.metric("Обычный запрос", f"{result['plaintext_bytes']} байт")
-
-        if scenario_id == "regression":
-            delta_phe_encoded = abs(float(result["pred_secure"]) - float(result["pred_encoded"]))
-            r1, r2 = st.columns(2)
-            r1.metric("Разность защищённого и обычного прогноза", f"{delta_phe_baseline:.6f}")
-            r2.metric("Разность защищённого и кодированного прогноза", f"{delta_phe_encoded:.6f}")
-    else:
-        k1.metric("Сервер видит исходные признаки", "НЕТ")
-        k2.metric("Совпадение с обычной моделью", "—")
-        k3.metric("Увеличение размера запроса", "—")
-        k4.metric("Зашифрованный запрос", "—")
-        k5.metric("Обычный запрос", "—")
-
-
-def show_metrics_dashboard() -> None:
-    """Render experiment evidence with explanatory comments."""
-    st.header("Результаты экспериментов")
-
-    csv_files = sorted(TABLES_DIR.glob("*.csv"))
-    plot_files = sorted(PLOTS_DIR.glob("*.png"))
-
-    if not csv_files and not plot_files:
-        st.info(
-            "Результаты экспериментов не найдены. Запустите сценарии в директории experiments/, чтобы сформировать таблицы и графики."
-        )
-        return
-
-    if not csv_files:
-        st.info(
-            "Файлы с таблицами метрик отсутствуют в results/tables/. Запустите эксперименты для формирования табличных результатов."
-        )
-
-    for csv_file in csv_files:
-        try:
-            df = pd.read_csv(csv_file)
-        except Exception as exc:
-            st.warning(f"Не удалось прочитать {csv_file.name}: {exc}")
-            continue
-        st.subheader(f"Таблица: {_get_artifact_title(csv_file.name)}")
-        st.caption(f"Файл с результатами: `{csv_file.name}`")
-        st.dataframe(_prepare_display_dataframe(df), width="stretch")
-
-        if csv_file.name == "latency_metrics.csv" and {"stage", "mean_ms"}.issubset(df.columns):
-            totals = df.set_index("stage")["mean_ms"].to_dict()
-            total_with_keygen = totals.get("total")
-            total_without_keygen = totals.get("total_without_keygen")
-            if total_with_keygen is not None and total_without_keygen is not None:
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Общее время с генерацией ключей, мс", f"{total_with_keygen:.2f}")
-                with col2:
-                    st.metric("Общее время без генерации ключей, мс", f"{total_without_keygen:.2f}")
-
-        st.markdown(f"**Интерпретация:** {_get_table_explanation(csv_file.name, df)}")
-
-    if not plot_files:
-        st.info(
-            "Файлы с графиками отсутствуют в results/plots/. Запустите эксперименты визуализации результатов."
-        )
-
-    for plot_file in plot_files:
-        st.subheader(f"График: {_get_artifact_title(plot_file.name)}")
-        st.caption(f"Файл с графиком: `{plot_file.name}`")
-        st.image(str(plot_file), width="stretch")
-        st.markdown(f"**Вывод:** {_get_plot_explanation(plot_file.name)}")
-
-
-def show_architecture() -> None:
-    """Render architecture and threat model without image schemes."""
-    st.header("Архитектура и модель угроз")
-    st.markdown(
-        """
-### Как работает система
-
-1. **Клиент подготавливает данные.**
-   Пользователь выбирает объект из тестовой выборки. На стороне клиента признаки масштабируются,
-   переводятся в целые числа и шифруются.
-
-2. **Сервер получает только зашифрованные признаки.**
-   Сервер не видит исходные значения признаков. Он получает открытую часть ключа,
-   набор зашифрованных чисел и служебные параметры, необходимые для расчёта.
-
-3. **Сервер выполняет расчёт над зашифрованными данными.**
-   Сервер использует заранее обученную модель и возвращает клиенту зашифрованный результат
-   линейного вычисления.
-
-4. **Клиент расшифровывает результат.**
-   Закрытый ключ хранится только у клиента. После расшифровки клиент получает итоговое значение:
-   для классификации — класс объекта, для регрессии — числовой прогноз.
-
-### Что защищается
-
-- исходные признаки клиента;
-- промежуточный результат расчёта до расшифровки;
-- закрытый ключ, который не покидает сторону клиента.
-
-### Что видит сервер
-
-- открытую часть ключа;
-- зашифрованные признаки;
-- количество признаков;
-- выбранный тип задачи;
-- служебные параметры кодирования.
-
-### Что сервер не видит
-
-- исходные значения признаков;
-- закрытый ключ клиента;
-- расшифрованный результат вычисления.
-
-### Модель угроз
-
-В демонстрации рассматривается сервер, который корректно выполняет протокол,
-но может пытаться извлечь информацию из полученных данных. Такая модель подходит
-для сценария удалённого применения машинного обучения, когда клиент не хочет
-раскрывать свои данные серверной стороне.
-
-### Ограничения демонстрации
-
-- модель сервера не скрывается от самого сервера;
-- факт обращения к серверу и технические метаданные не защищаются;
-- активные атаки, компрометация клиента и атаки по побочным каналам не рассматриваются;
-- прототип предназначен для демонстрации и экспериментальной оценки, а не для промышленного внедрения без дополнительной защиты.
-        """
-    )
+    render_calculation_trace(result=result, scenario=scenario, sample=sample, scale=SCALE)
+    render_sample_level_metrics(result, scenario_id)
 
 
 def main() -> None:
     """Run the Streamlit application."""
+    apply_styles()
     st.title("Защищённое предсказание модели — пошаговая демонстрация")
     try:
         resources = load_resources()
@@ -765,7 +476,7 @@ def main() -> None:
     with tab1:
         show_live_protocol_demo(resources)
     with tab2:
-        show_metrics_dashboard()
+        show_metrics_dashboard(TABLES_DIR, PLOTS_DIR)
     with tab3:
         show_architecture()
 
