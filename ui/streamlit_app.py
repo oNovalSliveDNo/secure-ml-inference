@@ -24,7 +24,7 @@ from app.model import extract_linear_params, load_model
 from ui.calculation_trace import render_calculation_trace
 from ui.components import render_step_statuses
 from ui.metrics_view import render_sample_level_metrics, show_metrics_dashboard
-from ui.protocol_view import show_architecture
+from ui.protocol_view import render_protocol_exchange_layout, show_architecture
 from ui.styles import apply_styles
 from ui.ui_models import ProtocolState
 
@@ -178,6 +178,15 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             "Шаг 7. Итоговая сводка",
         ],
         current_step,
+    )
+
+    render_protocol_exchange_layout(
+        result=result,
+        scenario=scenario,
+        sample=sample,
+        current_step=current_step,
+        scale=SCALE,
+        scenario_id=scenario_id,
     )
 
     if current_step >= 1:
