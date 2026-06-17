@@ -367,22 +367,35 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
         ],
         current_step,
     )
-    render_protocol_exchange_layout(
-        result=result,
-        scenario=scenario,
-        sample=sample,
-        current_step=current_step,
-        scale=SCALE,
-        scenario_id=scenario_id,
-        detailed=detailed_mode,
-    )
-    with st.expander("Подробная математика и все промежуточные значения", expanded=False):
-        render_calculation_trace(result=result, scenario=scenario, sample=sample, scale=SCALE)
 
     if current_step >= 7 and "comparison_df" in result:
         render_sample_level_metrics(result, scenario_id)
         if scenario_id == "regression":
             render_compact_aggregate_regression_summary()
+
+        with st.expander("Показать выполненные этапы протокола", expanded=False):
+            render_protocol_exchange_layout(
+                result=result,
+                scenario=scenario,
+                sample=sample,
+                current_step=current_step,
+                scale=SCALE,
+                scenario_id=scenario_id,
+                detailed=detailed_mode,
+            )
+    else:
+        render_protocol_exchange_layout(
+            result=result,
+            scenario=scenario,
+            sample=sample,
+            current_step=current_step,
+            scale=SCALE,
+            scenario_id=scenario_id,
+            detailed=detailed_mode,
+        )
+
+    with st.expander("Подробная математика и все промежуточные значения", expanded=False):
+        render_calculation_trace(result=result, scenario=scenario, sample=sample, scale=SCALE)
 
 
 def main() -> None:
