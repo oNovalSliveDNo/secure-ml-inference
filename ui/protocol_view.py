@@ -111,7 +111,10 @@ def render_protocol_exchange_layout(
         st.write("✓ Исходные данные локальны  ")
         st.write("✓ Закрытый ключ не передаётся")
         ex = _feature_example(sample, scenario, result)
-        if current_step >= 1 and ex:
+
+        def render_scaling_step(*, show_table: bool) -> None:
+            if not ex:
+                return
             name, raw, mean, sigma, scaled = ex
             render_operation_card(
                 "Масштабирование признаков",
@@ -119,9 +122,7 @@ def render_protocol_exchange_layout(
                 f"{name}: ({raw} − {mean}) / {sigma} = {scaled}",
             )
             st.write(f"Обработано признаков: {len(sample)}")
-            with st.expander(
-                "Показать все исходные и масштабированные признаки", expanded=detailed
-            ):
+            if show_table:
                 scaler = scenario["scaler"]
                 st.dataframe(
                     pd.DataFrame(
@@ -135,7 +136,10 @@ def render_protocol_exchange_layout(
                     ),
                     width="stretch",
                 )
-        if current_step >= 2 and "x_int" in result:
+
+        def render_encoding_step(*, show_table: bool) -> None:
+            if "x_int" not in result:
+                return
             value = int(result["x_int"][0])
             scaled_value = float(result["x_scaled"][0])
             render_operation_card(
@@ -145,7 +149,7 @@ def render_protocol_exchange_layout(
             )
             st.write(f"Масштаб S: {scale:,}".replace(",", " "))
             st.write(f"Закодировано значений: {len(result['x_int'])}")
-            with st.expander("Все закодированные значения", expanded=detailed):
+            if show_table:
                 st.dataframe(
                     pd.DataFrame(
                         {
@@ -156,13 +160,16 @@ def render_protocol_exchange_layout(
                     ),
                     width="stretch",
                 )
-        if current_step >= 3 and "enc_x" in result:
+
+        def render_encryption_step(*, show_table: bool) -> None:
+            if "enc_x" not in result:
+                return
             render_operation_card("Шифрование Paillier", "c_i = Enc_pk(x_int)")
             st.write(f"Длина ключа: {KEY_LENGTH} бит")
             st.write(f"Зашифровано признаков: {len(result['enc_x'])}")
             st.write("Закрытый ключ остаётся у клиента")
             st.code(_preview(result["enc_x"][0], 64))
-            with st.expander("Зашифрованные признаки и открытый ключ", expanded=detailed):
+            if show_table:
                 client = result.get("client")
                 if client is not None:
                     st.code(f"Открытый ключ n = {_preview(client.public_key.n, 120)}")
@@ -175,13 +182,40 @@ def render_protocol_exchange_layout(
                     ),
                     width="stretch",
                 )
-        if current_step >= 6 and "z_secure" in result:
+
+        def render_decryption_step() -> None:
+            if "z_secure" not in result:
+                return
             render_operation_card("Результат получен и расшифрован", "z = Dec_sk(Enc(z_int)) / S²")
             st.write(f"Расшифрованное целое значение: `{result['score_int']}`")
             st.write(f"Итоговый прогноз: `{_fmt(result['z_secure'], 6)}`")
             if scenario_id == "classification":
                 st.write(f"Вероятность класса: `{_fmt(result.get('prob_secure'), 4)}`")
                 st.write(f"Предсказанный класс: `{result.get('pred_secure', '—')}`")
+
+        completed_client_steps = [
+            (1, "✓ Масштабирование", render_scaling_step),
+            (2, "✓ Кодирование", render_encoding_step),
+            (3, "✓ Шифрование", render_encryption_step),
+        ]
+        completed_statuses = [
+            label for step, label, _ in completed_client_steps if current_step > step
+        ]
+        if completed_statuses:
+            st.caption(" · ".join(completed_statuses))
+            with st.expander("Ранее выполненные действия клиента", expanded=False):
+                for step, _, render_step in completed_client_steps:
+                    if current_step > step:
+                        render_step(show_table=detailed)
+
+        if current_step == 1:
+            render_scaling_step(show_table=detailed)
+        elif current_step == 2:
+            render_encoding_step(show_table=detailed)
+        elif current_step == 3:
+            render_encryption_step(show_table=detailed)
+        elif current_step == 6:
+            render_decryption_step()
 
     with channel_col, st.container(key="channel_zone", border=True):
         _active_note(current_step, "channel")
