@@ -5,11 +5,11 @@ from __future__ import annotations
 import streamlit as st
 
 PALETTE = {
-    "client": "#f97360",
+    "client": "#22A06B",
     "client_bg": "#fff4f0",
     "transport": "#64748b",
     "transport_bg": "#f4f8fc",
-    "server": "#22a06b",
+    "server": "#F97360",
     "server_bg": "#effcf5",
     "warning": "#d97706",
     "danger": "#dc2626",
@@ -40,9 +40,9 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(div[data-testid="stVerticalB
 div[data-testid="stVerticalBlockBorderWrapper"]:has(div[data-testid="stVerticalBlock"][data-st-key="channel_zone"]) {{ background:{PALETTE["transport_bg"]}; border-color:#94a3b8; }}
 div[data-testid="stVerticalBlockBorderWrapper"]:has(div[data-testid="stVerticalBlock"][data-st-key="server_zone"]) {{ background:{PALETTE["server_bg"]}; border-color:{PALETTE["server"]}; }}
 .active-zone {{ border:2px solid currentColor; box-shadow:0 8px 20px rgba(15,23,42,.10); border-radius:.75rem; padding:.35rem; margin-bottom:.35rem; font-weight:700; }}
-.active-zone-client {{ background:#fff1ed; color:{PALETTE["client"]}; box-shadow:0 8px 20px rgba(249,115,96,.14); }}
+.active-zone-client {{ background:#ecfdf5; color:{PALETTE["client"]}; box-shadow:0 8px 20px rgba(249,115,96,.14); }}
 .active-zone-channel {{ background:#eff6ff; color:{PALETTE["blue"]}; box-shadow:0 8px 20px rgba(37,99,235,.14); }}
-.active-zone-server {{ background:#ecfdf5; color:{PALETTE["server"]}; box-shadow:0 8px 20px rgba(34,160,107,.14); }}
+.active-zone-server {{ background:#fff1ed; color:{PALETTE["server"]}; box-shadow:0 8px 20px rgba(34,160,107,.14); }}
 .channel-arrow {{ text-align:center; font-weight:800; font-size:1.05rem; margin:.4rem 0; color:{PALETTE["text"]}; white-space:nowrap; }}
 .metric-card-header {{ display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem; margin-bottom:.45rem; }}
 .metric-card-title {{ color:{PALETTE["text"]}; font-size:.82rem; font-weight:700; }}
@@ -58,6 +58,15 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(div[data-testid="stVerticalB
 .operation-example {{ font-size:.86rem; color:#334155; }}
 .operation-example-feature {{ font-weight:700; color:{PALETTE["text"]}; }}
 .operation-example-technical {{ font-size:.74rem; color:#64748b; margin:.1rem 0 .25rem; }}
+
+[data-testid="stToolbar"] {{ visibility: hidden; }}
+#MainMenu {{ visibility: hidden; }}
+footer {{ visibility: hidden; }}
+.important-number {{ font-size:1.35rem; font-weight:850; color:#0f172a; line-height:1.15; }}
+.zone-title {{ display:block; border-top:4px solid currentColor; padding-top:.3rem; font-weight:850; letter-spacing:.02em; }}
+.zone-title-client {{ color:#22A06B; }}
+.zone-title-channel {{ color:#2563eb; text-align:center; }}
+.zone-title-server {{ color:#F97360; }}
 </style>
 """
 

@@ -14,5 +14,6 @@ pydantic
 
 streamlit
 requests
+httpx
 
 python-dotenv

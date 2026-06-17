@@ -24,6 +24,7 @@ from app.model import extract_linear_params, load_model
 from ui.calculation_trace import render_calculation_trace
 from ui.components import render_step_statuses
 from ui.metrics_view import (
+    render_compact_aggregate_classification_summary,
     render_compact_aggregate_regression_summary,
     render_sample_level_metrics,
     show_metrics_dashboard,
@@ -66,7 +67,7 @@ def load_resources() -> dict[str, Any]:
         )
         w_cls, b_cls = extract_linear_params(cls_model)
         scenarios["classification"] = {
-            "title": "Классификация: диагностика опухоли",
+            "title": "Классификация опухоли на учебном наборе Breast Cancer Wisconsin",
             "task_type": "classification",
             "model": cls_model,
             "scaler": cls_model.named_steps["scaler"],
@@ -371,6 +372,8 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
 
     if current_step >= 7 and "comparison_df" in result:
         render_sample_level_metrics(result, scenario_id)
+        if scenario_id == "classification":
+            render_compact_aggregate_classification_summary()
         if scenario_id == "regression":
             render_compact_aggregate_regression_summary()
 
@@ -403,6 +406,9 @@ def main() -> None:
     """Run the Streamlit application."""
     apply_styles()
     st.title("Защищённое предсказание модели — пошаговая демонстрация")
+    st.caption(
+        "Прототип предназначен для исследовательской демонстрации и не является медицинской диагностической системой."
+    )
     try:
         resources = load_resources()
     except FileNotFoundError as exc:

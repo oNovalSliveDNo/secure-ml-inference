@@ -16,10 +16,11 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
 from app.client import Client
-from app.config import KEY_LENGTH, RANDOM_STATE, SCALE, TEST_SIZE
+from app.config import KEY_LENGTH, RANDOM_STATE, SCALE, TEST_SIZE, THRESHOLD
+from app.data import load_dataset, split_dataset
 from app.encoding import decode_score, encode_bias, encode_weights, encoded_plaintext_score
 from app.linear_scorer import EncryptedLinearScorer
-from app.model import load_model
+from app.model import extract_linear_params, load_model
 from ui.components import render_metric_card, render_status_banner
 from ui.metrics_helpers import (
     DEFAULT_FIDELITY_TOLERANCE,
@@ -255,8 +256,14 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
                 and baseline_value is not None
                 and int(true_value) == int(baseline_value)
             )
-            st.write(f"Истинный класс: **{true_class}**")
-            st.write(f"Предсказанный класс: **{baseline_class}**")
+            st.markdown(
+                f"Истинный класс:<div class='important-number'>{true_class}</div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"Предсказанный класс:<div class='important-number'>{baseline_class}</div>",
+                unsafe_allow_html=True,
+            )
             st.write(f"Вероятность: **{_format_number(probability, 4)}**")
             render_status_banner(
                 "Классификация выполнена верно"
@@ -283,7 +290,10 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
             )
             st.write(f"Истинное значение: **{_format_number(true_number, 4)}**")
             st.write(f"Прогноз модели: **{_format_number(baseline_number, 4)}**")
-            st.write(f"Абсолютная ошибка: **{_format_number(abs_error, 4)}**")
+            st.markdown(
+                f"Абсолютная ошибка:<div class='important-number'>{_format_number(abs_error, 4)}</div>",
+                unsafe_allow_html=True,
+            )
             if level == "normal":
                 render_status_banner(status_text, "green")
             elif level == "warning":
@@ -333,11 +343,24 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
         if tolerance is not None and delta_secure_baseline is not None
         else None
     )
-    fidelity_color: Literal["green", "yellow", "red"] = (
-        "green"
-        if (delta_secure_baseline or 0) <= 0.01
-        else ("yellow" if (delta_secure_baseline or 0) <= 0.05 else "red")
+    classes_match = True
+    if scenario_id == "classification":
+        classes_match = (
+            baseline_value is not None
+            and secure_value is not None
+            and int(baseline_value) == int(secure_value)
+        )
+    within_tolerance = (
+        tolerance is not None
+        and delta_secure_baseline is not None
+        and delta_secure_baseline <= tolerance + 1e-12
     )
+    if scenario_id == "classification" and not classes_match:
+        fidelity_color: Literal["green", "yellow", "red"] = "red"
+    elif within_tolerance:
+        fidelity_color = "green"
+    else:
+        fidelity_color = "yellow"
 
     with f_col, st.container(border=True):
         st.subheader("Влияние защиты")
@@ -345,17 +368,32 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
             st.write(f"Вероятность без защиты: **{_format_number(baseline_number, 4)}**")
             st.write(f"Защищённое предсказание: **{format_class_label(secure_value)}**")
             st.write(f"Вероятность в защищённом режиме: **{_format_number(secure_number, 4)}**")
-            st.write(f"Отклонение вероятности: **{_format_number(delta_secure_baseline, 6)}**")
+            st.markdown(
+                f"Отклонение вероятности:<div class='important-number'>{_format_number(delta_secure_baseline, 6)}</div>",
+                unsafe_allow_html=True,
+            )
         else:
             st.write(f"Обычный прогноз: **{_format_number(baseline_number, 4)}**")
             st.write(f"Защищённый прогноз: **{_format_number(secure_number, 4)}**")
-            st.write(f"Отклонение прогноза: **{_format_number(delta_secure_baseline, 6)}**")
-        render_status_banner(
-            f"✓ Отклонение {_format_number(delta_secure_baseline, 6)} меньше допуска {_format_number(tolerance, 2)}"
-            if fidelity_color == "green"
-            else f"Отклонение {_format_number(delta_secure_baseline, 6)} требует внимания",
-            fidelity_color,
-        )
+            st.markdown(
+                f"Отклонение прогноза:<div class='important-number'>{_format_number(delta_secure_baseline, 6)}</div>",
+                unsafe_allow_html=True,
+            )
+            if scenario_id == "classification" and fidelity_color == "red":
+                banner_text = "Защищённый класс отличается от baseline"
+            elif fidelity_color == "green":
+                banner_text = (
+                    f"Класс совпал, вероятность в пределах допуска {_format_number(tolerance, 2)}"
+                    if scenario_id == "classification"
+                    else f"Отклонение в пределах допуска {_format_number(tolerance, 2)}"
+                )
+            else:
+                banner_text = (
+                    f"Класс совпал, но отклонение выше допуска {_format_number(tolerance, 2)}"
+                    if scenario_id == "classification"
+                    else f"Отклонение выше допуска {_format_number(tolerance, 2)}"
+                )
+            render_status_banner(banner_text, fidelity_color)
         with st.expander("Подробности сравнения режимов", expanded=False):
             if scenario_id == "classification":
                 encoded_class = result.get("pred_encoded")
@@ -380,14 +418,23 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
                 st.write(
                     f"Δ PHE относительно кодирования: {_format_number(delta_secure_encoded, 6)}"
                 )
+            st.write(
+                f"Численный допуск сравнения защищённого и обычного режимов: {_format_number(tolerance, 2)}"
+            )
             st.write(f"Запас до допуска: {_format_number(margin, 6)}")
 
     with p_col, st.container(border=True):
         st.subheader("Конфиденциальность и затраты")
         st.write("✓ Сервер не видит исходные признаки")
         st.write("✓ Закрытый ключ не передаётся")
-        st.write(f"Размер запроса: **{_format_bytes(result.get('encrypted_bytes'))}**")
-        st.write(f"Полное время запроса: **{_format_ms(result.get('http_elapsed_ms'))}**")
+        st.markdown(
+            f"Размер запроса:<div class='important-number'>{_format_bytes(result.get('encrypted_bytes'))}</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f"Полное время запроса:<div class='important-number'>{_format_ms(result.get('http_elapsed_ms'))}</div>",
+            unsafe_allow_html=True,
+        )
         with st.expander("Подробности времени и объёма данных", expanded=False):
             st.write(f"Размер обычного запроса: {_format_bytes(result.get('plaintext_bytes'))}")
             st.write(
@@ -410,10 +457,18 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
                 "Если класс выбран неверно, это относится к исходной ML-модели, а не к криптографическому преобразованию."
             )
         else:
+            regression_baseline_number = _to_float(baseline_value)
+            regression_true_number = _to_float(true_value)
+            regression_abs_error = (
+                abs(regression_baseline_number - regression_true_number)
+                if regression_baseline_number is not None and regression_true_number is not None
+                else None
+            )
+            abs_error_text = _format_number(regression_abs_error, 4)
             message = (
-                "Защищённый режим воспроизводит результат базовой модели в пределах установленного допуска. "
-                f"Отклонение PHE от обычного прогноза: {_format_number(delta_secure_baseline, 6)}. "
-                "Если ошибка велика, она относится к исходной ML-модели, а не к криптографическому преобразованию."
+                f"**Исходная модель:** ошибка на объекте — {abs_error_text}.  \n"
+                f"**Защищённый режим:** дополнительное отклонение — {_format_number(delta_secure_baseline, 6)}.\n\n"
+                "Следовательно, большая ошибка относится к Ridge-модели, а не к криптографическому преобразованию."
             )
         if fidelity_color == "green":
             st.success(message)
@@ -421,6 +476,62 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
             st.warning(message)
         else:
             st.error(message)
+
+
+@st.cache_data(show_spinner=False)
+def _compute_aggregate_classification_payload() -> dict[str, float]:
+    """Compute aggregate classification fidelity for the full test set."""
+    model = load_model("results/models/model.pkl")
+    features, target = load_dataset()
+    _, x_test, _, y_test = split_dataset(
+        features=features, target=target, test_size=TEST_SIZE, random_state=RANDOM_STATE
+    )
+    y_true = y_test.to_numpy(dtype=int)
+    baseline_probs = np.asarray(model.predict_proba(x_test)[:, 1], dtype=np.float64)
+    baseline_pred = (baseline_probs >= THRESHOLD).astype(int)
+    weights, bias = extract_linear_params(model)
+    scaler = model.named_steps["scaler"]
+    encoded_weights = encode_weights(w=weights, scale=SCALE)
+    encoded_bias = encode_bias(b=bias, scale=SCALE)
+    client = Client(scaler=scaler, scale=SCALE, key_length=KEY_LENGTH)
+    server = EncryptedLinearScorer(
+        w_int=encoded_weights, b_int=encoded_bias, public_key=client.public_key
+    )
+    phe_probs = []
+    for row_idx in range(len(x_test)):
+        x_scaled = client.preprocess(x_test.iloc[[row_idx]]).reshape(-1)
+        encrypted_score = server.compute_encrypted_score(client.encrypt(client.encode(x_scaled)))
+        score_int = client.private_key.decrypt(encrypted_score)
+        z_phe = decode_score(score_int=score_int, scale=SCALE)
+        phe_probs.append(float(1.0 / (1.0 + np.exp(-z_phe))))
+    phe_probs_array = np.asarray(phe_probs, dtype=np.float64)
+    phe_pred = (phe_probs_array >= THRESHOLD).astype(int)
+    abs_delta = np.abs(phe_probs_array - baseline_probs)
+    return {
+        "accuracy_baseline": float(np.mean(baseline_pred == y_true)),
+        "accuracy_phe": float(np.mean(phe_pred == y_true)),
+        "class_match_rate": float(np.mean(phe_pred == baseline_pred)),
+        "mean_abs_prob_delta": float(np.mean(abs_delta)),
+        "max_abs_prob_delta": float(np.max(abs_delta)),
+    }
+
+
+def render_compact_aggregate_classification_summary() -> None:
+    """Render one compact aggregate classification summary for the live demo."""
+    try:
+        details = _compute_aggregate_classification_payload()
+    except Exception as exc:
+        st.warning(f"Не удалось рассчитать компактную сводку классификации: {exc}")
+        return
+    st.info(
+        "По всей тестовой выборке: "
+        f"Accuracy baseline: {_format_percent(details['accuracy_baseline'], 2)} | "
+        f"Accuracy PHE: {_format_percent(details['accuracy_phe'], 2)} | "
+        f"Совпадение классов: {_format_percent(details['class_match_rate'], 2)} | "
+        f"Среднее |Δ вероятности|: {_format_number(details['mean_abs_prob_delta'], 6)} | "
+        f"Максимальное |Δ вероятности|: {_format_number(details['max_abs_prob_delta'], 6)}\n\n"
+        "Подробные результаты находятся во вкладке «Результаты экспериментов»."
+    )
 
 
 def _regression_quality_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:

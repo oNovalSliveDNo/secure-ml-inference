@@ -197,7 +197,9 @@ def render_protocol_exchange_layout(
 
     with client_col, st.container(key="client_zone", border=True):
         _active_note(current_step, "client")
-        st.markdown("**КЛИЕНТ**  ")
+        st.markdown(
+            "<span class='zone-title zone-title-client'>🔐 КЛИЕНТ</span>", unsafe_allow_html=True
+        )
         st.caption("Владелец данных и закрытого ключа")
         render_compact_kpi("Выбран объект", str(result.get("human_sample_idx", "—")))
         render_compact_kpi("Количество признаков", str(len(sample)))
@@ -324,7 +326,10 @@ def render_protocol_exchange_layout(
 
     with channel_col, st.container(key="channel_zone", border=True):
         _active_note(current_step, "channel")
-        st.markdown("**Канал передачи**")
+        st.markdown(
+            "<span class='zone-title zone-title-channel'>⇄ КАНАЛ ПЕРЕДАЧИ</span>",
+            unsafe_allow_html=True,
+        )
         request_size = result.get("encrypted_bytes")
         status_code = result.get("status_code")
         if current_step < 4:
@@ -354,7 +359,9 @@ def render_protocol_exchange_layout(
 
     with server_col, st.container(key="server_zone", border=True):
         _active_note(current_step, "server")
-        st.markdown("**СЕРВЕР**")
+        st.markdown(
+            "<span class='zone-title zone-title-server'>⚙ СЕРВЕР</span>", unsafe_allow_html=True
+        )
         st.caption("Владелец модели")
         st.write(f"Сценарий: {'классификация' if scenario_id == 'classification' else 'регрессия'}")
         st.write(f"Модель: {get_model_label(scenario_id)}")
