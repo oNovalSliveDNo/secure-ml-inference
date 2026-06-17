@@ -197,7 +197,7 @@ def _prepare_display_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     display_df = df.rename(
         columns={column: _COLUMN_TRANSLATIONS.get(column, column) for column in df.columns}
     ).copy()
-    for column in display_df.select_dtypes(include="object").columns:
+    for column in display_df.select_dtypes(include=["object", "string"]).columns:
         display_df[column] = display_df[column].map(
             lambda value: _VALUE_TRANSLATIONS.get(value, value) if isinstance(value, str) else value
         )

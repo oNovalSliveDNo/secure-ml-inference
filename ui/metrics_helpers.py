@@ -59,7 +59,7 @@ def classify_fidelity_status(delta_phe_baseline: float | None) -> tuple[str, str
     """Classify PHE-vs-baseline fidelity using the default UI tolerance."""
     if delta_phe_baseline is None:
         return "Недостаточно данных", "off"
-    if delta_phe_baseline <= DEFAULT_FIDELITY_TOLERANCE:
+    if delta_phe_baseline <= DEFAULT_FIDELITY_TOLERANCE + 1e-12:
         return "В пределах допуска", "normal"
     return "Выше допуска", "critical"
 
