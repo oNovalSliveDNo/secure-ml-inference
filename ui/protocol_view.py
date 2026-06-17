@@ -11,6 +11,7 @@ import streamlit as st
 from app.config import KEY_LENGTH
 from app.crypto import serialize_ciphertext
 from ui.components import render_arrow, render_card, render_compact_kpi, render_operation_card
+from ui.metrics_helpers import format_class_label
 from ui.styles import PALETTE
 
 
@@ -216,7 +217,7 @@ def render_protocol_exchange_layout(
             st.write(f"Итоговый прогноз: `{_fmt(result['z_secure'], 6)}`")
             if scenario_id == "classification":
                 st.write(f"Вероятность класса: `{_fmt(result.get('prob_secure'), 4)}`")
-                st.write(f"Предсказанный класс: `{result.get('pred_secure', '—')}`")
+                st.write(f"Предсказанный класс: `{format_class_label(result.get('pred_secure'))}`")
 
         completed_client_steps = [
             (1, "✓ Масштабирование", render_scaling_step),

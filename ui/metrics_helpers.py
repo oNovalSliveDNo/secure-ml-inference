@@ -42,6 +42,28 @@ def _finite_float_array(values: Iterable[Any]) -> np.ndarray:
     return cast("np.ndarray", array[np.isfinite(array)])
 
 
+# sklearn.datasets.load_breast_cancer exposes target_names in this order:
+# index 0 = "malignant", index 1 = "benign". The project model is trained
+# on that target vector unchanged, so UI labels must preserve this mapping.
+_BREAST_CANCER_CLASS_LABELS = {
+    0: "0 — злокачественная опухоль",
+    1: "1 — доброкачественная опухоль",
+}
+
+
+def format_class_label(value: int | float | None) -> str:
+    """Return a human-readable Breast Cancer class label for UI rendering."""
+    if value is None:
+        return "—"
+    number = _to_float(value)
+    if number is None:
+        return "—"
+    class_id = int(number)
+    if not np.isclose(number, class_id):
+        return f"{number:g} — неизвестный класс"
+    return _BREAST_CANCER_CLASS_LABELS.get(class_id, f"{class_id} — неизвестный класс")
+
+
 def classify_sample_error_status(
     sample_abs_error: float | None, median_abs_error: float | None, p90_abs_error: float | None
 ) -> tuple[str, str]:

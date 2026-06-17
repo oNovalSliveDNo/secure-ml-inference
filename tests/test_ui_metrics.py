@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import pytest
+from sklearn.datasets import load_breast_cancer
 
 from ui.metrics_helpers import (
     compute_fidelity_metrics,
     compute_regression_error_distribution,
     compute_sample_regression_metrics,
+    format_class_label,
 )
 
 
@@ -81,3 +83,14 @@ def test_fidelity_delta_thresholds_green_and_red() -> None:
 
     assert red_metrics.delta_phe_baseline == pytest.approx(0.051)
     assert red_metrics.status_level == "critical"  # red/critical in rendered status
+
+
+def test_breast_cancer_class_labels_match_sklearn_target_order() -> None:
+    """sklearn load_breast_cancer target_names order is malignant, benign."""
+    dataset = load_breast_cancer()
+
+    assert dataset.target_names.tolist() == ["malignant", "benign"]
+    assert format_class_label(0) == "0 — злокачественная опухоль"
+    assert format_class_label(1.0) == "1 — доброкачественная опухоль"
+    assert format_class_label(None) == "—"
+    assert format_class_label(2) == "2 — неизвестный класс"

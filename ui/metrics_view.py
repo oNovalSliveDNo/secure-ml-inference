@@ -24,6 +24,7 @@ from ui.components import render_metric_card, render_status_banner
 from ui.metrics_helpers import (
     DEFAULT_FIDELITY_TOLERANCE,
     classify_sample_error_status,
+    format_class_label,
 )
 
 
@@ -220,8 +221,8 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
     with q_col, st.container(border=True):
         st.subheader("Качество исходной модели")
         if scenario_id == "classification":
-            true_class = str(int(true_value)) if true_value is not None else "—"
-            baseline_class = str(int(baseline_value)) if baseline_value is not None else "—"
+            true_class = format_class_label(true_value)
+            baseline_class = format_class_label(baseline_value)
             probability = result.get("prob_baseline")
             ok = (
                 true_value is not None
@@ -316,6 +317,7 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
         st.subheader("Влияние защиты")
         if scenario_id == "classification":
             st.write(f"Вероятность без защиты: **{_format_number(baseline_number, 6)}**")
+            st.write(f"Защищённое предсказание: **{format_class_label(secure_value)}**")
             st.write(f"Вероятность в защищённом режиме: **{_format_number(secure_number, 6)}**")
             st.write(f"Отклонение вероятности: **{_format_number(delta_secure_baseline, 6)}**")
         else:
@@ -331,12 +333,13 @@ def render_sample_level_metrics(result: dict[str, Any], scenario_id: str) -> Non
         with st.expander("Подробности сравнения режимов", expanded=False):
             if scenario_id == "classification":
                 encoded_class = result.get("pred_encoded")
-                encoded_class_text = str(int(encoded_class)) if encoded_class is not None else "—"
+                encoded_class_text = format_class_label(encoded_class)
                 st.write(
                     f"Линейный результат после кодирования z: {_format_number(encoded_value, 6)}"
                 )
                 st.write(f"Вероятность после кодирования: {_format_number(encoded_number, 6)}")
                 st.write(f"Класс после кодирования: {encoded_class_text}")
+                st.write(f"Класс защищённого режима: {format_class_label(secure_value)}")
                 st.write(
                     f"Δ вероятность после кодирования относительно режима без защиты: {_format_number(delta_encoded_baseline, 6)}"
                 )
