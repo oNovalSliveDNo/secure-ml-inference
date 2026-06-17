@@ -160,7 +160,8 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             st.write(f"Объект {sample_idx + 1} из {len(x_test)}")
 
         with detail_col:
-            detailed_mode = st.toggle("Подробный режим", value=False, key="detailed_mode")
+            detailed_mode = st.toggle("Технические подробности", value=False, key="detailed_mode")
+            st.caption("Показывает таблицы признаков, шифротексты и промежуточные расчёты.")
 
         st.session_state.setdefault(
             "demo_state",

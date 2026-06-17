@@ -159,19 +159,20 @@ def render_protocol_exchange_layout(
             )
             st.write(f"Обработано признаков: {len(sample)}")
             if show_table:
-                scaler = scenario["scaler"]
-                st.dataframe(
-                    pd.DataFrame(
-                        {
-                            "Признак": feature_names,
-                            "Исходное значение": sample.values,
-                            "Среднее μ": scaler.mean_,
-                            "Масштаб σ": scaler.scale_,
-                            "Масштабированное значение": result.get("x_scaled", []),
-                        }
-                    ),
-                    width="stretch",
-                )
+                with st.expander("Технические подробности масштабирования", expanded=detailed):
+                    scaler = scenario["scaler"]
+                    st.dataframe(
+                        pd.DataFrame(
+                            {
+                                "Признак": feature_names,
+                                "Исходное значение": sample.values,
+                                "Среднее μ": scaler.mean_,
+                                "Масштаб σ": scaler.scale_,
+                                "Масштабированное значение": result.get("x_scaled", []),
+                            }
+                        ),
+                        width="stretch",
+                    )
 
         def render_encoding_step(*, show_table: bool) -> None:
             if "x_int" not in result:
@@ -186,16 +187,17 @@ def render_protocol_exchange_layout(
             st.write(f"Масштаб S: {scale:,}".replace(",", " "))
             st.write(f"Закодировано значений: {len(result['x_int'])}")
             if show_table:
-                st.dataframe(
-                    pd.DataFrame(
-                        {
-                            "Признак": feature_names,
-                            "Масштабированное значение": result["x_scaled"],
-                            "Целое значение": result["x_int"],
-                        }
-                    ),
-                    width="stretch",
-                )
+                with st.expander("Технические подробности кодирования", expanded=detailed):
+                    st.dataframe(
+                        pd.DataFrame(
+                            {
+                                "Признак": feature_names,
+                                "Масштабированное значение": result["x_scaled"],
+                                "Целое значение": result["x_int"],
+                            }
+                        ),
+                        width="stretch",
+                    )
 
         def render_encryption_step(*, show_table: bool) -> None:
             if "enc_x" not in result:
@@ -207,20 +209,21 @@ def render_protocol_exchange_layout(
             st.write("Пример зашифрованного значения")
             st.code(_ciphertext_preview(result["enc_x"][0], 64))
             if show_table:
-                client = result.get("client")
-                if client is not None:
-                    st.code(f"Открытый ключ n = {_preview(client.public_key.n, 120)}")
-                st.dataframe(
-                    pd.DataFrame(
-                        {
-                            "Признак": feature_names,
-                            "Пример зашифрованного значения": [
-                                _ciphertext_preview(v, 80) for v in result["enc_x"]
-                            ],
-                        }
-                    ),
-                    width="stretch",
-                )
+                with st.expander("Технические подробности шифрования", expanded=detailed):
+                    client = result.get("client")
+                    if client is not None:
+                        st.code(f"Открытый ключ n = {_preview(client.public_key.n, 120)}")
+                    st.dataframe(
+                        pd.DataFrame(
+                            {
+                                "Признак": feature_names,
+                                "Пример зашифрованного значения": [
+                                    _ciphertext_preview(v, 80) for v in result["enc_x"]
+                                ],
+                            }
+                        ),
+                        width="stretch",
+                    )
 
         def render_decryption_step() -> None:
             if "z_secure" not in result:
