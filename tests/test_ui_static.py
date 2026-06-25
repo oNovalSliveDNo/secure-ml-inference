@@ -44,7 +44,7 @@ def test_server_addition_count_equals_feature_count() -> None:
 
 def test_detailed_trace_is_closed_by_default_and_duplicate_step_expanders_removed() -> None:
     app = read("ui/streamlit_app.py")
-    assert '"Подробная математика и все промежуточные значения", expanded=False' in app
+    assert '"Технические расчёты и промежуточные значения", expanded=False' in app
     assert 'with st.expander("Шаг 1. Масштабирование' not in app
     assert "Исходные признаки (видны только клиенту)" not in app
 

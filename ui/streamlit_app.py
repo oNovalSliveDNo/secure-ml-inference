@@ -33,7 +33,7 @@ from ui.protocol_view import render_protocol_exchange_layout, show_architecture
 from ui.styles import apply_styles
 from ui.ui_models import ProtocolState
 
-st.set_page_config(page_title="Защищённое предсказание модели — демонстрация", layout="wide")
+st.set_page_config(page_title="Защищённое вычисление предсказания — демонстрация", layout="wide")
 
 MODEL_PATH = Path("results/models/model.pkl")
 REGRESSION_MODEL_PATH = Path("results/models/regression_model.pkl")
@@ -67,7 +67,7 @@ def load_resources() -> dict[str, Any]:
         )
         w_cls, b_cls = extract_linear_params(cls_model)
         scenarios["classification"] = {
-            "title": "Классификация опухоли на учебном наборе Breast Cancer Wisconsin",
+            "title": "Учебная бинарная классификация — Breast Cancer Wisconsin",
             "task_type": "classification",
             "model": cls_model,
             "scaler": cls_model.named_steps["scaler"],
@@ -95,7 +95,7 @@ def load_resources() -> dict[str, Any]:
         w_reg = ridge.coef_.ravel()
         b_reg = float(ridge.intercept_)
         scenarios["regression"] = {
-            "title": "Регрессия: числовой медицинский прогноз",
+            "title": "Регрессия на учебном наборе Diabetes",
             "task_type": "regression",
             "model": reg_model,
             "scaler": scaler,
@@ -118,8 +118,8 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
     st.header("Пошаговая демонстрация")
 
     st.info(
-        "Модель на клиенте загружена только для сравнения результатов. "
-        "В реальном протоколе веса модели находятся на сервере."
+        "Локальная копия модели используется только для контрольного сравнения. "
+        "В защищённом протоколе параметры модели хранятся на сервере."
     )
 
     scenarios = resources["scenarios"]
@@ -398,14 +398,14 @@ def show_live_protocol_demo(resources: dict[str, Any]) -> None:
             detailed=detailed_mode,
         )
 
-    with st.expander("Подробная математика и все промежуточные значения", expanded=False):
+    with st.expander("Технические расчёты и промежуточные значения", expanded=False):
         render_calculation_trace(result=result, scenario=scenario, sample=sample, scale=SCALE)
 
 
 def main() -> None:
     """Run the Streamlit application."""
     apply_styles()
-    st.title("Защищённое предсказание модели — пошаговая демонстрация")
+    st.title("Защищённое вычисление предсказания — пошаговая демонстрация")
     st.caption(
         "Прототип предназначен для исследовательской демонстрации и не является медицинской диагностической системой."
     )

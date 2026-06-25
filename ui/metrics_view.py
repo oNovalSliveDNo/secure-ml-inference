@@ -192,7 +192,7 @@ _COLUMN_TRANSLATIONS = {
     "overhead_ratio": "Увеличение размера",
     "feature_count": "Число признаков",
     "key_length": "Длина ключа",
-    "scale": "Масштаб кодирования",
+    "scale": "Масштаб перевода в целые числа",
     "sample_count": "Число объектов",
 }
 _VALUE_TRANSLATIONS = {

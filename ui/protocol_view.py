@@ -203,7 +203,7 @@ def render_protocol_exchange_layout(
         st.caption("Владелец данных и закрытого ключа")
         render_compact_kpi("Выбран объект", str(result.get("human_sample_idx", "—")))
         render_compact_kpi("Количество признаков", str(len(sample)))
-        st.write("✓ Исходные данные локальны  ")
+        st.write("✓ Исходные данные остаются на стороне клиента")
         st.write("✓ Закрытый ключ не передаётся")
         ex = _feature_example(sample, scenario, result)
 
@@ -366,8 +366,8 @@ def render_protocol_exchange_layout(
         st.write(f"Сценарий: {'классификация' if scenario_id == 'classification' else 'регрессия'}")
         st.write(f"Модель: {get_model_label(scenario_id)}")
         st.caption(get_model_technical_name(scenario_id))
-        st.write(f"Коэффициентов: {server_data['coefficient_count']}")
-        st.write(f"Масштаб кодирования: {_fmt_int(scale)}")
+        st.write(f"Количество признаков модели: {server_data['coefficient_count']}")
+        st.write(f"Масштаб перевода в целые числа: {_fmt_int(scale)}")
         if current_step >= 4:
             st.write(f"Получено зашифрованных признаков: {server_data['feature_count']}")
             st.write("Открытые значения признаков: недоступны")
